@@ -1,0 +1,7 @@
+{
+  "name": "Secrets",
+  "description": "Expose build secrets to your jobs",
+  "author": "@lox",
+  "public": true,
+  "requirements": ["curl", "bash"]
+}

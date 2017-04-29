@@ -1,0 +1,104 @@
+#!/bin/bash
+
+set -eu -o pipefail
+
+s3_exists() {
+  local bucket="$1"
+  local key="$2"
+  local aws_s3_args=("--region=$AWS_DEFAULT_REGION")
+
+  if [[ -n "${BUILDKITE_SECRETS_KEY:-}" ]] ; then
+    aws_s3_args+=("--sse-customer-algorithm" "AES256" "--sse-customer-key" "${BUILDKITE_SECRETS_KEY}")
+  fi
+
+  if ! env -i aws s3api head-object "${aws_s3_args[@]}" --bucket "$bucket" --key "$key" &>/dev/null ; then
+    return 1
+  fi
+}
+
+s3_download() {
+  local bucket="$1"
+  local key="$2"
+  local aws_s3_args=("--quiet" "--region=$AWS_DEFAULT_REGION")
+
+  if [[ -n "${BUILDKITE_SECRETS_KEY:-}" ]] ; then
+    aws_s3_args+=("--sse-c" "AES256" "--sse-c-key" "${BUILDKITE_SECRETS_KEY}")
+  elif [[ "${BUILDKITE_USE_KMS:-true}" =~ ^(true|1)$ ]] ; then
+    aws_s3_args+=("--sse" "aws:kms")
+  fi
+
+  if ! env -i aws s3 cp "${aws_s3_args[@]}" "s3://$1/$2" /dev/stdout ; then
+    exit 1
+  fi
+}
+
+s3_bucket="${BUILDKITE_PLUGIN_SECRETS_S3_BUCKET:-}"
+s3_bucket_prefix="${BUILDKITE_PLUGIN_SECRETS_S3_BUCKET_PREFIX:-$BUILDKITE_PIPELINE_SLUG}"
+
+echo "Starting an SSH Agent..."
+eval "$(ssh-agent -s)"
+echo
+
+if [[ -n "$s3_bucket" ]] ; then
+  ssh_key_paths=(
+    "$s3_bucket_prefix/private_ssh_key"
+    "$s3_bucket_prefix/id_rsa_github"
+    "private_ssh_key"
+    "id_rsa_github"
+  )
+
+  for key in ${ssh_key_paths[*]} ; do
+    if s3_exists "${s3_bucket}" "$key" ; then
+      echo "~~~ Downloading ssh-key from ${key}"
+      if ! ssh_key=$(s3_download "${s3_bucket}" "$key") ; then
+        echo "~~~ :warning: Failed to download ssh-key $key"
+        exit 1
+      fi
+      SSH_ASKPASS="/bin/false" ssh-add <(echo "$ssh_key")
+      key_found=1
+      break
+    fi
+  done
+
+  if [[ -z "${key_found:-}" ]] && [[ "${BUILDKITE_REPO:-}" =~ ^git ]] ; then
+    echo "~~~ :warning: Failed to find an SSH key in secret bucket"
+    exit 1
+  fi
+
+  env_paths=(
+    "env"
+    "environment"
+    "${s3_bucket_prefix}/env"
+    "${s3_bucket_prefix}/environment"
+  )
+
+  for key in ${env_paths[*]} ; do
+    if s3_exists "${s3_bucket}" "$key" ; then
+      echo "~~~ Downloading env file from $key"
+      if ! envvars=$(s3_download "${s3_bucket}" "$key") ; then
+        echo "~~~ :warning: Failed to download env from $key"
+        exit 1
+      fi
+      set -a
+      eval "$envvars"
+      set +a
+    fi
+  done
+
+  git_credentials_paths=(
+    "git-credentials"
+    "${s3_bucket_prefix}/git-credentials"
+  )
+
+  for key in ${git_credentials_paths[*]} ; do
+    if s3_exists "${s3_bucket}" "$key" ; then
+      echo "~~~ Downloading git-credentials files"
+      if ! envvars=$(s3_download "${s3_bucket}" "$key") ; then
+        echo "~~~ :warning: Failed to download git-credentials from $key"
+        exit 1
+      fi
+      mv "$key" .git-credentials
+      git config credential.helper "store --file=$PWD/.git-credentials"
+    fi
+  done
+fi
