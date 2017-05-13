@@ -26,5 +26,5 @@ steps:
     command: env
     plugins:
       ${BUILDKITE_REPO}#${commit}:
-        s3_bucket: my_test_bucket
+        s3_bucket: lox-buildkite-secrets
 YAML
