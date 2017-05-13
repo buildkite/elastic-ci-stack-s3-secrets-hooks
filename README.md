@@ -44,14 +44,6 @@ aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_b
 
 An s3 bucket to look for secrets in. If you use this option, `aws-cli` must be in your path. 
 
-### `kms_id`
-
-Your AWS KMS Default instance is used unless you specific an alternative. Make sure to use this KMS for uploading secrets. A value of `false` will disable KMS usage entirely
-
-### `env`
-
-By default all env variables are exposed, this allows for you to whitelist which are exposed to the command.
-
 ## License
 
 MIT (see [LICENSE](LICENSE))

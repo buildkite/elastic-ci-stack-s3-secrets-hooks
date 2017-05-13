@@ -78,31 +78,3 @@ generate_file_list() {
   unstub ssh-agent
   unstub ssh-add
 }
-
-@test "Load env file from s3 bucket" {
-  export BUILDKITE_PLUGIN_SECRETS_S3_BUCKET=my_secrets_bucket
-  export BUILDKITE_PLUGIN_SECRETS_DUMP_ENV=true
-  export BUILDKITE_PIPELINE_SLUG=test
-
-  stub ssh-agent "-s : echo export SSH_AGENT_PID=224;"
-
-  stub aws \
-    "s3 ls --region=us-east-1 --recursive s3://my_secrets_bucket : echo -e '2013-09-02 21:37:53\t10 env\n2013-09-02 21:32:57\t23 private_ssh_key\n2013-09-02 21:32:58\t41 test/private_ssh_key\n'" \
-    "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/private_ssh_key /dev/stdout : echo secret material" \
-    "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/test/private_ssh_key /dev/stdout : echo secret material" \
-    "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/env /dev/stdout : echo SECRET=24"
-
-  stub ssh-add \
-    "echo added ssh key 1" \
-    "echo added ssh key 2"
-
-  run $PWD/hooks/environment
-
-  assert_success
-  assert_output --partial "added ssh key 1"
-  assert_output --partial "added ssh key 2"
-  assert_output --partial "SECRET=24"
-
-  unstub ssh-agent
-  unstub ssh-add
-}
