@@ -18,7 +18,7 @@ steps:
   - label: run bats tests
     command: tests/
     plugins:
-      docker-compose#v1.2.1
+      docker-compose#v1.2.1:
         run: tests
 
   - wait
