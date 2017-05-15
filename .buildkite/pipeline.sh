@@ -22,8 +22,8 @@ steps:
         run: tests
 
   - wait
-  - label: check secrets are exposed correctly
-    command: env
+  - label: check keys have been added to ssh-agent
+    command: ssh-add -l
     plugins:
       ${BUILDKITE_REPO}#${commit}:
         s3_bucket: lox-buildkite-secrets
