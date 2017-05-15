@@ -76,17 +76,16 @@ s3_bucket_listable=
 s3_bucket_list=()
 ls_output=
 
-echo "~~~ Listing keys in :s3: $s3_bucket" >&2;
-if ls_output="$(s3_list "$s3_bucket")" ; then
-  s3_bucket_listable=1
-  declare -a 's3_bucket_list=('"$ls_output"')'
-  echo "LISTABLE"
-else
-  echo "~~~ :warning: Failed to list keys" >&2;
-fi
-
 if [[ -n "$s3_bucket" ]] ; then
   echo "~~~ Downloading secrets from :s3: $s3_bucket" >&2;
+
+  echo "Attempting to list keys in :s3: $s3_bucket" >&2;
+  if ls_output="$(s3_list "$s3_bucket")" ; then
+    s3_bucket_listable=1
+    declare -a 's3_bucket_list=('"$ls_output"')'
+  else
+    echo "Wasn't able to list keys, so will try individual head-object calls"
+  fi
 
   ssh_key_paths=(
     "$s3_bucket_prefix/private_ssh_key"
