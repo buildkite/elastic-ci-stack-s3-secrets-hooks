@@ -82,6 +82,7 @@ if [[ -n "$s3_bucket" ]] ; then
   echo "Attempting to list keys in :s3: $s3_bucket" >&2;
   if ls_output="$(s3_list "$s3_bucket")" ; then
     s3_bucket_listable=1
+    echo "$ls_output"
     declare -a 's3_bucket_list=('"$ls_output"')'
   else
     echo "Wasn't able to list keys, so will try individual head-object calls"
