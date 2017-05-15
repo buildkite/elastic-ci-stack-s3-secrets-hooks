@@ -1,5 +1,6 @@
 #!/bin/bash
 
 if [[ -n "${SSH_AGENT_PID:-}" ]] ; then
-  ssh-agent -k
+  echo "~~~ Stopping ssh-agent ${SSH_AGENT_PID}"
+  ssh-agent -k || true
 fi
