@@ -1,8 +1,8 @@
-# Secrets Buildkite Plugin
+# AWS S3 Secrets Buildkite Plugin
 
 __This is designed to run with Buildkite Agent v3.x beta. Plugins are not yet supported in Buildkite Agent v2.x.__
 
-Expose secrets to your build steps. Storage and transport is handled by various supported backends, initially encrypted files in Amazon S3.
+Expose secrets to your build steps. Secrets are stored encrypted-at-rest in Amazon S3.
 
 Different types of secrets are supported and exposed to your builds in appropriate ways:
 

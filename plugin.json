@@ -1,5 +1,5 @@
 {
-  "name": "Secrets",
+  "name": "S3 Secrets",
   "description": "Expose build secrets to your jobs",
   "author": "@lox",
   "public": true,
