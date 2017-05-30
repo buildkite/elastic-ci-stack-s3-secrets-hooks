@@ -2,8 +2,10 @@
 
 set -eu -o pipefail
 
+basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+
 # shellcheck disable=SC1090
-. "$PWD/lib/shared.bash"
+. "$basedir/lib/shared.bash"
 
 if [[ -z "${AWS_DEFAULT_REGION:-}" ]] ; then
   export AWS_DEFAULT_REGION=us-east-1
