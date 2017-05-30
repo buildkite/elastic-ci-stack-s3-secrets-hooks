@@ -11,8 +11,8 @@ if [[ -z "${AWS_DEFAULT_REGION:-}" ]] ; then
   export AWS_DEFAULT_REGION=us-east-1
 fi
 
-s3_bucket="${BUILDKITE_PLUGIN_SECRETS_S3_BUCKET:-}"
-s3_bucket_prefix="${BUILDKITE_PLUGIN_SECRETS_S3_BUCKET_PREFIX:-$BUILDKITE_PIPELINE_SLUG}"
+s3_bucket="${BUILDKITE_PLUGIN_S3_SECRETS_S3_BUCKET:-}"
+s3_bucket_prefix="${BUILDKITE_PLUGIN_S3_SECRETS_S3_BUCKET_PREFIX:-$BUILDKITE_PIPELINE_SLUG}"
 s3_bucket_listable=
 ls_output=
 
@@ -71,7 +71,7 @@ if [[ -n "$s3_bucket" ]] ; then
     fi
   done
 
-  if [[ "${BUILDKITE_PLUGIN_SECRETS_DUMP_ENV:-1}" =~ ^(true|1)$ ]] ; then
+  if [[ "${BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV:-1}" =~ ^(true|1)$ ]] ; then
     echo "~~~ Environment variables that were set" >&2;
     comm -13 <(echo "$env_before") <(env | sort) || true
   fi
