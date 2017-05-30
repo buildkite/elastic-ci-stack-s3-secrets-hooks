@@ -15,16 +15,9 @@ fi
 
 cat <<YAML
 steps:
-  - label: run bats tests
+  - label: ":bash: :hammer:"
     command: tests/
     plugins:
       docker-compose#v1.2.1:
         run: tests
-
-  - wait
-  - label: check keys have been added to ssh-agent
-    command: ssh-add -l
-    plugins:
-      ${BUILDKITE_REPO}#${commit}:
-        s3_bucket: lox-buildkite-secrets
 YAML
