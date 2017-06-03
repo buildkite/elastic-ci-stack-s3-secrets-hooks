@@ -16,8 +16,8 @@ generate_file_list() {
 }
 
 @test "Load env file from s3 bucket" {
-  export BUILDKITE_PLUGIN_SECRETS_S3_BUCKET=my_secrets_bucket
-  export BUILDKITE_PLUGIN_SECRETS_DUMP_ENV=true
+  export BUILDKITE_PLUGIN_S3_SECRETS_BUCKET=my_secrets_bucket
+  export BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV=true
   export BUILDKITE_PIPELINE_SLUG=test
 
   stub ssh-agent "-s : echo export SSH_AGENT_PID=224;"
@@ -46,8 +46,8 @@ generate_file_list() {
 }
 
 @test "Load env file from s3 bucket (not listable)" {
-  export BUILDKITE_PLUGIN_SECRETS_S3_BUCKET=my_secrets_bucket
-  export BUILDKITE_PLUGIN_SECRETS_DUMP_ENV=true
+  export BUILDKITE_PLUGIN_S3_SECRETS_BUCKET=my_secrets_bucket
+  export BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV=true
   export BUILDKITE_PIPELINE_SLUG=test
 
   stub ssh-agent "-s : echo echo started ssh-agent"

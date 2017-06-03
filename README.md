@@ -19,8 +19,8 @@ The private key is exposed to both the checkout and the command as an ssh-agent 
 steps:
   - command: ./run_build.sh
     plugins:
-      lox/secrets#v1.0:
-        s3_bucket: my-buildkite-secrets
+      s3-secrets:
+        bucket: my-buildkite-secrets
 ```
 
 ## Uploading Secrets
@@ -40,9 +40,9 @@ aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_b
 
 ## Options
 
-### `s3_bucket`
+### `bucket`
 
-An s3 bucket to look for secrets in. If you use this option, `aws-cli` must be in your path. 
+An s3 bucket to look for secrets in. 
 
 ## License
 
