@@ -19,7 +19,7 @@ The private key is exposed to both the checkout and the command as an ssh-agent 
 steps:
   - command: ./run_build.sh
     plugins:
-      s3-secrets:
+      s3-secrets#v1.0.1:
         bucket: my-buildkite-secrets
 ```
 
