@@ -19,7 +19,7 @@ ls_output=
 if [[ -n "$s3_bucket" ]] ; then
   echo "~~~ Downloading secrets from :s3: $s3_bucket" >&2;
 
-  echo "Attempting to list keys in :s3: $s3_bucket" >&2;
+  echo "Attempting to list keys in s3 bucket $s3_bucket" >&2;
   if ls_output="$(s3_list "$s3_bucket")" ; then
     s3_bucket_listable=1
     declare -a 's3_bucket_list=('"$ls_output"')'
@@ -41,6 +41,7 @@ if [[ -n "$s3_bucket" ]] ; then
         echo "~~~ :warning: Failed to download ssh-key $key" >&2;
         exit 1
       fi
+      echo "Downloaded ${#ssh_key} bytes of ssh key"
       add_ssh_private_key_to_agent "$ssh_key"
       key_found=1
     fi
