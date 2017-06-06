@@ -4,3 +4,8 @@ if [[ -n "${SSH_AGENT_PID:-}" ]] && ps -p "$SSH_AGENT_PID" &>/dev/null; then
   echo "~~~ Stopping ssh-agent ${SSH_AGENT_PID}"
   ssh-agent -k
 fi
+
+if [[ -n "${git_credentials_file:-}" ]] ; then
+  echo "~~~ Cleaning up git credentials"
+  rm $git_credentials_file
+fi

@@ -34,7 +34,7 @@ generate_file_list() {
     "echo added ssh key 1" \
     "echo added ssh key 2"
 
-  run $PWD/hooks/environment
+  run bash -c "$PWD/hooks/environment && $PWD/hooks/post-command"
 
   assert_success
   assert_output --partial "added ssh key 1"
@@ -50,7 +50,7 @@ generate_file_list() {
   export BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV=true
   export BUILDKITE_PIPELINE_SLUG=test
 
-  stub ssh-agent "-s : echo echo started ssh-agent"
+  stub ssh-agent "-s : echo export SSH_AGENT_PID=93799"
 
   stub aws \
     "s3 ls --region=us-east-1 --recursive s3://my_secrets_bucket : exit 1" \
@@ -70,10 +70,10 @@ generate_file_list() {
   stub ssh-add \
     "echo added ssh key"
 
-  run $PWD/hooks/environment
+  run bash -c "$PWD/hooks/environment && $PWD/hooks/post-command"
 
   assert_success
-  assert_output --partial "started ssh-agent"
+  assert_output --partial "ssh-agent (pid 93799)"
   assert_output --partial "added ssh key"
   assert_output --partial "SECRET=24"
 

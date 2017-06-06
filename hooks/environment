@@ -88,13 +88,14 @@ if [[ -n "$s3_bucket" ]] ; then
   for key in ${git_credentials_paths[*]} ; do
     if has_secrets_key "$key" ; then
       echo "~~~ Downloading git-credentials files" >&2;
-      if ! envvars=$(s3_download "${s3_bucket}" "$key") ; then
+      if ! credentials=$(s3_download "${s3_bucket}" "$key") ; then
         echo "~~~ :warning: Failed to download git-credentials from $key" >&2;
         exit 1
       fi
       git_credentials="$(mktemp "$PWD/git-credentials.XXXXXXXXXXX")"
-      echo "$key" > "$git_credentials"
+      echo "$credentials" > "$git_credentials"
       git config credential.helper "store --file=$git_credentials"
+      export git_credentials_file=$git_credentials
     fi
   done
 fi
