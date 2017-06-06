@@ -49,10 +49,6 @@ s3_download() {
   fi
 }
 
-safe_env_export() {
-  sed -E -n 's/[^#]+/export &/ p'
-}
-
 add_ssh_private_key_to_agent() {
   local ssh_key="$1"
 

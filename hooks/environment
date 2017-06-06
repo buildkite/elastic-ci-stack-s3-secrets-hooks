@@ -64,11 +64,14 @@ if [[ -n "$s3_bucket" ]] ; then
   for key in ${env_paths[*]} ; do
     if has_secrets_key "$key" "$s3_bucket_listable" ; then
       echo "~~~ Downloading env file from $key" >&2;
-      if ! envvars=$(s3_download "${s3_bucket}" "$key") ; then
+      if ! envscript=$(s3_download "${s3_bucket}" "$key") ; then
         echo "~~~ :warning: Failed to download env from $key" >&2;
         exit 1
       fi
-      eval "$(safe_env_export <<< "$envvars")"
+      echo "Evaluating ${#envscript} bytes of env"
+      set -o allexport
+      eval "$envscript"
+      set +o allexport
     fi
   done
 
