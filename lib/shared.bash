@@ -53,12 +53,6 @@ safe_env_export() {
   sed -E -n 's/[^#]+/export &/ p'
 }
 
-ssh_add_with_chmod() {
-  local f="$1"
-  chmod 0500 "$f"
-  SSH_ASKPASS="/bin/false" ssh-add "$f"
-}
-
 add_ssh_private_key_to_agent() {
   local ssh_key="$1"
 
@@ -68,7 +62,7 @@ add_ssh_private_key_to_agent() {
   fi
 
   echo "~~~ Loading ssh-key into ssh-agent (pid ${SSH_AGENT_PID:-})" >&2;
-  ssh_add_with_chmod <(echo "$ssh_key")
+  echo "$ssh_key" | env SSH_ASKPASS="/bin/false" ssh-add -
 }
 
 grep_secrets() {
