@@ -52,10 +52,10 @@ if [[ -n "$s3_bucket" ]] ; then
   fi
 
   env_paths=(
-    "${s3_bucket_prefix}/env"
-    "${s3_bucket_prefix}/environment"
     "env"
     "environment"
+    "${s3_bucket_prefix}/env"
+    "${s3_bucket_prefix}/environment"
   )
 
   env_before="$(env | sort)"

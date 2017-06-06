@@ -59,11 +59,11 @@ generate_file_list() {
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key private_ssh_key : exit 0" \
     "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/private_ssh_key /dev/stdout : echo secret material" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key id_rsa_github : exit 1" \
-    "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/env : exit 1" \
-    "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/environment : exit 1" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key env : exit 0" \
     "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/env /dev/stdout : echo SECRET=24" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key environment : exit 1" \
+    "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/env : exit 1" \
+    "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/environment : exit 1" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key git-credentials : exit 1" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/git-credentials : exit 1"
 
