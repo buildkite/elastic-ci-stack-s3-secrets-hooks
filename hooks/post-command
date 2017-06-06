@@ -7,5 +7,5 @@ fi
 
 if [[ -n "${git_credentials_file:-}" ]] ; then
   echo "~~~ Cleaning up git credentials"
-  rm $git_credentials_file
+  rm "$git_credentials_file"
 fi

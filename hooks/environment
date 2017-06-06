@@ -36,9 +36,9 @@ if [[ -n "$s3_bucket" ]] ; then
 
   for key in ${ssh_key_paths[*]} ; do
     if has_secrets_key "$key" "$s3_bucket_listable" ; then
-      echo "~~~ Downloading ssh-key from ${key}" >&2;
+      echo "Downloading ssh-key from ${key}" >&2;
       if ! ssh_key=$(s3_download "${s3_bucket}" "$key") ; then
-        echo "~~~ :warning: Failed to download ssh-key $key" >&2;
+        echo "+++ :warning: Failed to download ssh-key $key" >&2;
         exit 1
       fi
       echo "Downloaded ${#ssh_key} bytes of ssh key"
@@ -48,7 +48,7 @@ if [[ -n "$s3_bucket" ]] ; then
   done
 
   if [[ -z "${key_found:-}" ]] && [[ "${BUILDKITE_REPO:-}" =~ ^git ]] ; then
-    echo "~~~ :warning: Failed to find an SSH key in secret bucket" >&2;
+    echo "+++ :warning: Failed to find an SSH key in secret bucket" >&2;
     exit 1
   fi
 
@@ -63,9 +63,9 @@ if [[ -n "$s3_bucket" ]] ; then
 
   for key in ${env_paths[*]} ; do
     if has_secrets_key "$key" "$s3_bucket_listable" ; then
-      echo "~~~ Downloading env file from $key" >&2;
+      echo "Downloading env file from ${key}" >&2;
       if ! envscript=$(s3_download "${s3_bucket}" "$key") ; then
-        echo "~~~ :warning: Failed to download env from $key" >&2;
+        echo "+++ :warning: Failed to download env from $key" >&2;
         exit 1
       fi
       echo "Evaluating ${#envscript} bytes of env"
@@ -87,11 +87,12 @@ if [[ -n "$s3_bucket" ]] ; then
 
   for key in ${git_credentials_paths[*]} ; do
     if has_secrets_key "$key" ; then
-      echo "~~~ Downloading git-credentials files" >&2;
+      echo "Downloading git-credentials files from ${key}" >&2;
       if ! credentials=$(s3_download "${s3_bucket}" "$key") ; then
-        echo "~~~ :warning: Failed to download git-credentials from $key" >&2;
+        echo "+++ :warning: Failed to download git-credentials from $key" >&2;
         exit 1
       fi
+      echo "Downloaded ${#credentials} bytes of ssh key"
       git_credentials="$(mktemp "$PWD/git-credentials.XXXXXXXXXXX")"
       echo "$credentials" > "$git_credentials"
       git config credential.helper "store --file=$git_credentials"
