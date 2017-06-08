@@ -2,6 +2,9 @@
 
 set -eu -o pipefail
 
+export PATH="$HOME/.rbenv/bin:/usr/local/bin:$PATH"
+eval "$(rbenv init -)"
+
 rbenv versions
 gem info
 echo $PATH
