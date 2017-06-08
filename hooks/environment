@@ -2,6 +2,10 @@
 
 set -eu -o pipefail
 
+rbenv versions
+gem info
+echo $PATH
+
 basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
 # shellcheck disable=SC1090
