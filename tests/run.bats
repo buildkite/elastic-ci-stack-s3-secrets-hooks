@@ -23,6 +23,7 @@ generate_file_list() {
   stub ssh-agent "-s : echo export SSH_AGENT_PID=224;"
 
   stub aws \
+    "aws s3api head-bucket --bucket my_secrets_bucket : exit 0" \
     "s3 ls --region=us-east-1 --recursive s3://my_secrets_bucket : echo -e '2013-09-02 21:37:53\t10 env\n2013-09-02 21:32:57\t23 private_ssh_key\n2013-09-02 21:32:58\t41 test/private_ssh_key\n'" \
     "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/private_ssh_key /dev/stdout : echo secret material" \
     "s3 cp --quiet --region=us-east-1 --sse aws:kms s3://my_secrets_bucket/test/private_ssh_key /dev/stdout : echo secret material" \
@@ -53,6 +54,7 @@ generate_file_list() {
   stub ssh-agent "-s : echo export SSH_AGENT_PID=93799"
 
   stub aws \
+    "aws s3api head-bucket --bucket my_secrets_bucket : echo Forbidden; exit 0" \
     "s3 ls --region=us-east-1 --recursive s3://my_secrets_bucket : exit 1" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/private_ssh_key : exit 1" \
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/id_rsa_github : exit 1" \

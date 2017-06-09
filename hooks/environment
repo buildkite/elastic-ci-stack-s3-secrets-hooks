@@ -19,6 +19,11 @@ ls_output=
 if [[ -n "$s3_bucket" ]] ; then
   echo "~~~ Downloading secrets from :s3: $s3_bucket" >&2;
 
+  if ! s3_bucket_exists "$s3_bucket".; then
+    echo "+++ :warning: Bucket $s3_bucket doesn't exist" >&2;
+    exit 1
+  fi
+
   echo "Attempting to list keys in s3 bucket $s3_bucket" >&2;
   if ls_output="$(s3_list "$s3_bucket")" ; then
     s3_bucket_listable=1
@@ -75,7 +80,7 @@ if [[ -n "$s3_bucket" ]] ; then
     fi
   done
 
-  if [[ "${BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV:-1}" =~ ^(true|1)$ ]] ; then
+  if [[ "${BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV:-}" =~ ^(true|1)$ ]] ; then
     echo "~~~ Environment variables that were set" >&2;
     comm -13 <(echo "$env_before") <(env | sort) || true
   fi

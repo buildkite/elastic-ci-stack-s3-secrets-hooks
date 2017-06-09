@@ -19,6 +19,13 @@ s3_exists() {
   fi
 }
 
+s3_bucket_exists() {
+  local bucket="$1"
+  if aws s3api head-bucket --bucket "$bucket" 2>&1 | grep -q "Not Found" ; then
+    return 1
+  fi
+}
+
 has_secrets_key() {
   local key="$1"
   local has_list="${2:-}"
