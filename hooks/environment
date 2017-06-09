@@ -8,10 +8,7 @@ basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 . "$basedir/lib/shared.bash"
 
 TMPDIR=${TMPDIR:-/tmp}
-
-if [[ -z "${AWS_DEFAULT_REGION:-}" ]] ; then
-  export AWS_DEFAULT_REGION=us-east-1
-fi
+AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
 
 s3_bucket="${BUILDKITE_PLUGIN_S3_SECRETS_BUCKET:-}"
 s3_bucket_prefix="${BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX:-$BUILDKITE_PIPELINE_SLUG}"
@@ -95,16 +92,21 @@ if [[ -n "$s3_bucket" ]] ; then
         exit 1
       fi
       echo "Downloaded ${#credentials} bytes of credentials"
+
+      # create a temporary credential file the first time
       if [[ -z "${GIT_CREDENTIALS_FILE:-}" ]] ; then
         GIT_CREDENTIALS_FILE="$(mktemp "$TMPDIR/git-credentials.XXXXXXXXXXX")"
-        echo "$credentials" >> "$GIT_CREDENTIALS_FILE"
         export GIT_CREDENTIALS_FILE
       fi
+
+      # combine credential files into one
+      echo "$credentials" >> "$GIT_CREDENTIALS_FILE"
+
       if [[ ! -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]] ; then
-        echo "Setting git clone flags"
+        echo "Checkout path doesn't exist, setting credential.helper on clone"
         export BUILDKITE_GIT_CLONE_FLAGS="${BUILDKITE_GIT_CLONE_FLAGS:--v} --config credential.helper='store --file=$GIT_CREDENTIALS_FILE'"
       else
-        echo "Setting config in checked out repo"
+        echo "Checkout path exists, updating credential.helper in local git config"
         GIT_DIR="$BUILDKITE_BUILD_CHECKOUT_PATH/.git" git config --local credential.helper "store --file=$GIT_CREDENTIALS_FILE"
       fi
     fi
