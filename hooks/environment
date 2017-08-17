@@ -26,7 +26,8 @@ if [[ -n "$s3_bucket" ]] ; then
   echo "Attempting to list keys in s3 bucket $s3_bucket" >&2;
   if ls_output="$(s3_list "$s3_bucket")" ; then
     s3_bucket_listable=1
-    declare -a 's3_bucket_list=('"$ls_output"')'
+    s3_bucket_list=($ls_output)
+    echo "Found ${#s3_bucket_list[@]} possible credentials in the bucket"
   else
     echo "Wasn't able to list keys, so will try individual head-object calls"
   fi
