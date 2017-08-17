@@ -39,6 +39,7 @@ if [[ -n "$s3_bucket" ]] ; then
   )
 
   for key in ${ssh_key_paths[*]} ; do
+    echo "Checking if $key exists"
     if has_secrets_key "$key" "$s3_bucket_listable" ; then
       echo "Downloading ssh-key from ${key}" >&2;
       if ! ssh_key=$(s3_download "${s3_bucket}" "$key") ; then
