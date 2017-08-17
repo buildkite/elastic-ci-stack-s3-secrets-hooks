@@ -4,9 +4,12 @@ s3_list() {
   local bucket="$1"
   local aws_s3_args=("--region=$AWS_DEFAULT_REGION")
 
+  (
+  set -x
   if ! aws s3 ls "${aws_s3_args[@]}" --recursive "s3://${bucket}" ; then
     return 1
   fi | awk '{print $4}'
+  )
 }
 
 s3_exists() {
