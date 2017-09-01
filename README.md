@@ -8,7 +8,7 @@ Different types of secrets are supported and exposed to your builds in appropria
 
 - `ssh-agent` for SSH Private Keys
 - Environment Variables for strings
-- `git-credentials` via git's credential.helper store
+- `git-credential` via git's credential.helper
 
 ## Example
 
@@ -41,6 +41,19 @@ aws s3 cp --acl private --sse aws:kms id_rsa_buildkite "s3://${secrets_bucket}/p
 
 ### Git credentials
 
+For git over https, you can use a `git-credentials` file with credential urls in the format of:
+
+```
+https://user:password@host/path/to/repo
+```
+
+```
+aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host/path/to/repo") "s3://${secrets_bucket}/git-credentials" 
+```
+
+These are then exposed via a [gitcredential helper](https://git-scm.com/docs/gitcredentials) which will download the 
+credentials as needed.
+
 ### Environment variables
 
 Key values pairs can also be uploaded.
@@ -48,8 +61,6 @@ Key values pairs can also be uploaded.
 ```
 aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment" 
 ```
-
-
 
 ## Options
 
