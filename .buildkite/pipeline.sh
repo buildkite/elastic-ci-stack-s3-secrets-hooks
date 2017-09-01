@@ -22,6 +22,6 @@ steps:
   - label: "㊙️ git-credentials test"
     command: .buildkite/test_credentials.sh
     plugins:
-      s3-secrets-buildkite-plugin#${commit}:
+      s3-secrets#${commit}:
         bucket: buildkite-agents-elastic-secrets
 YAML
