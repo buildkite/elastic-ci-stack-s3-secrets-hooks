@@ -1,5 +1,0 @@
-steps:
-  - label: ":bash: :hammer:"
-    plugins:
-      docker-compose#v1.3.2:
-        run: tests
