@@ -26,6 +26,8 @@ steps:
 
 ## Uploading Secrets
 
+### SSH Keys
+
 This example uploads an ssh key and an environment file to the root of the bucket, which means it matches all pipelines that use it. You use per-pipeline overrides by adding a path prefix of `/my-pipeline/`.
 
 ```bash
@@ -35,9 +37,19 @@ pbcopy < id_rsa_buildkite.pub # paste this into your github deploy key
 
 export secrets_bucket=my-buildkite-secrets
 aws s3 cp --acl private --sse aws:kms id_rsa_buildkite "s3://${secrets_bucket}/private_ssh_key" 
+```
 
+### Git credentials
+
+### Environment variables
+
+Key values pairs can also be uploaded.
+
+```
 aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment" 
 ```
+
+
 
 ## Options
 

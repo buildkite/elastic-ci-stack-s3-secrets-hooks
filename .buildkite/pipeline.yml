@@ -3,3 +3,9 @@ steps:
     plugins:
       docker-compose#v1.3.2:
         run: tests
+
+  - label: "㊙️ git-credentials test"
+    command: .buildkite/test_credentials.sh
+    plugins:
+      s3-secrets-buildkite-plugin#${BUILDKITE_COMMIT}:
+        bucket: buildkite-agents-elastic-secrets
