@@ -18,7 +18,7 @@ ls_output=
 if [[ -n "$s3_bucket" ]] ; then
   echo "~~~ Downloading secrets from :s3: $s3_bucket" >&2;
 
-  if ! s3_bucket_exists "$s3_bucket".; then
+  if ! s3_bucket_exists "$s3_bucket" ; then
     echo "+++ :warning: Bucket $s3_bucket doesn't exist" >&2;
     exit 1
   fi
@@ -81,41 +81,27 @@ if [[ -n "$s3_bucket" ]] ; then
     fi
   done
 
-  if [[ "${BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV:-}" =~ ^(true|1)$ ]] ; then
-    echo "~~~ Environment variables that were set" >&2;
-    comm -13 <(echo "$env_before") <(env | sort) || true
-  fi
-
   git_credentials_paths=(
     "git-credentials"
     "${s3_bucket_prefix}/git-credentials"
   )
 
+  git_credentials=()
+
   for key in ${git_credentials_paths[*]} ; do
     if has_secrets_key "$key" ; then
-      echo "Downloading git-credentials files from ${key}" >&2;
-      if ! credentials=$(s3_download "${s3_bucket}" "$key") ; then
-        echo "+++ :warning: Failed to download git-credentials from $key" >&2;
-        exit 1
-      fi
-      echo "Downloaded ${#credentials} bytes of credentials"
-
-      # create a temporary credential file the first time
-      if [[ -z "${GIT_CREDENTIALS_FILE:-}" ]] ; then
-        GIT_CREDENTIALS_FILE="$(mktemp "$TMPDIR/git-credentials.XXXXXXXXXXX")"
-        export GIT_CREDENTIALS_FILE
-      fi
-
-      # combine credential files into one
-      echo "$credentials" >> "$GIT_CREDENTIALS_FILE"
-
-      if [[ ! -d "$BUILDKITE_BUILD_CHECKOUT_PATH/.git" ]] ; then
-        echo "Checkout path doesn't exist, setting credential.helper on clone"
-        export BUILDKITE_GIT_CLONE_FLAGS="${BUILDKITE_GIT_CLONE_FLAGS:--v} --config credential.helper='store --file=$GIT_CREDENTIALS_FILE'"
-      else
-        echo "Checkout path exists, updating credential.helper in local git config"
-        GIT_DIR="$BUILDKITE_BUILD_CHECKOUT_PATH/.git" git config --local credential.helper "store --file=$GIT_CREDENTIALS_FILE"
-      fi
+      echo "Adding git-credentials in $key as a credential helper" >&2;
+      git_credentials+=("'credential.helper=$basedir/git-credential-s3-secrets ${s3_bucket} ${key}'")
     fi
   done
+
+  if [[ "${#git_credentials[@]}" -gt 0 ]] ; then
+    export GIT_CONFIG_PARAMETERS
+    GIT_CONFIG_PARAMETERS=$( IFS=' '; echo -n "${git_credentials[*]}" ) 
+  fi
+
+  if [[ "${BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV:-}" =~ ^(true|1)$ ]] ; then
+    echo "~~~ Environment variables that were set" >&2;
+    comm -13 <(echo "$env_before") <(env | sort) || true
+  fi
 fi
