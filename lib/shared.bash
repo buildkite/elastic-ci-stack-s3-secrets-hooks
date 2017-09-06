@@ -1,14 +1,5 @@
 #!/bin/bash
 
-s3_list() {
-  local bucket="$1"
-  local aws_s3_args=("--region=$AWS_DEFAULT_REGION")
-
-  if ! aws s3 ls "${aws_s3_args[@]}" --recursive "s3://${bucket}" ; then
-    return 1
-  fi | awk '{print $4}'
-}
-
 s3_exists() {
   local bucket="$1"
   local key="$2"
@@ -24,22 +15,6 @@ s3_bucket_exists() {
   if aws s3api head-bucket --bucket "$bucket" 2>&1 | grep -q "Not Found" ; then
     return 1
   fi
-}
-
-has_secrets_key() {
-  local key="$1"
-  local has_list="${2:-}"
-
-  if [[ -n "$has_list" && ${#s3_bucket_list[@]} -gt 0 ]] ; then
-    for object in "${s3_bucket_list[@]}" ; do
-      if [[ "$object" == "$key" ]] ; then
-        return 0
-      fi
-    done
-    return 1
-  fi
-
-  s3_exists "$s3_bucket" "$key"
 }
 
 s3_download() {
