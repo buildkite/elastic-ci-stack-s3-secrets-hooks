@@ -26,7 +26,7 @@ s3_download() {
     aws_s3_args+=("--sse" "aws:kms")
   fi
 
-  if ! aws s3 cp "${aws_s3_args[@]}" "s3://$1/$2" /dev/stdout ; then
+  if ! aws s3 cp "${aws_s3_args[@]}" "s3://$1/$2" - ; then
     exit 1
   fi
 }
