@@ -8,19 +8,50 @@ Different types of secrets are supported and exposed to your builds in appropria
 - Environment Variables for strings
 - `git-credential` via git's credential.helper
 
-## Example
+## Installation
 
-The following pipeline downloads a private key from `s3://my-buildkite-secrets/{pipeline}/ssh_private_key` and set of environment variables from `s3://my-buildkite-secrets/{pipeline}/environment`.
+This plugin needs to be installed directly in the agent so that secrets can be downloaded before jobs attempt checking out your repository. We are going to assume that buildkite has been installed at `/buildkite`, but this will vary depending on your operating system. Change the instructions accordingly.
+
+```
+# clone to a path your buildkite-agent can access
+git clone https://github.com/buildkite-plugins/s3-secrets-buildkite-plugin.git /buildkite/s3_secrets
+```
+
+Modify your agent's global hooks (see https://buildkite.com/docs/agent/v3/hooks#global-hooks):
+
+### `${BUILDKITE_ROOT}/hooks/environment`
+
+```bash
+if [[ "${SECRETS_PLUGIN_ENABLED:-1}" == "1" ]] ; then
+  export BUILDKITE_PLUGIN_S3_SECRETS_BUCKET="my-s3-secrets-bucket"
+
+  source /buildkite/s3_secrets/hooks/environment
+fi
+```
+
+### `${BUILDKITE_ROOT}/hooks/pre-exit`
+
+```bash
+if [[ "${SECRETS_PLUGIN_ENABLED:-1}" == "1" ]] ; then
+  export BUILDKITE_PLUGIN_S3_SECRETS_BUCKET="my-s3-secrets-bucket"
+
+  source /buildkite/s3_secrets/hooks/pre-exit
+fi
+```
+
+## Usage
+
+When run via the agent environment and pre-exit hook, your builds will check in the s3 secrets bucket you created for secrets files in the following formats:
+
+
+* `s3://{bucket_name}/{pipeline}/ssh_private_key`
+* `s3://{bucket_name}/{pipeline}/environment`
+* `s3://{bucket_name}/{pipeline}/git-credentials`
+* `s3://{bucket_name}/ssh_private_key`
+* `s3://{bucket_name}/environment`
+* `s3://{bucket_name}/git-credentials`
 
 The private key is exposed to both the checkout and the command as an ssh-agent instance. The secrets in the env file are exposed as environment variables.
-
-```yml
-steps:
-  - command: ./run_build.sh
-    plugins:
-      s3-secrets#v1.3.0:
-        bucket: my-buildkite-secrets
-```
 
 ## Uploading Secrets
 
@@ -34,8 +65,10 @@ ssh-keygen -t rsa -b 4096 -f id_rsa_buildkite
 pbcopy < id_rsa_buildkite.pub # paste this into your github deploy key
 
 export secrets_bucket=my-buildkite-secrets
-aws s3 cp --acl private --sse aws:kms id_rsa_buildkite "s3://${secrets_bucket}/private_ssh_key" 
+aws s3 cp --acl private --sse aws:kms id_rsa_buildkite "s3://${secrets_bucket}/private_ssh_key"
 ```
+
+Note the `-sse aws:kms`, as without this your secrets will fail to download.
 
 ### Git credentials
 
@@ -46,10 +79,10 @@ https://user:password@host/path/to/repo
 ```
 
 ```
-aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host/path/to/repo") "s3://${secrets_bucket}/git-credentials" 
+aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host/path/to/repo") "s3://${secrets_bucket}/git-credentials"
 ```
 
-These are then exposed via a [gitcredential helper](https://git-scm.com/docs/gitcredentials) which will download the 
+These are then exposed via a [gitcredential helper](https://git-scm.com/docs/gitcredentials) which will download the
 credentials as needed.
 
 ### Environment variables
@@ -57,14 +90,14 @@ credentials as needed.
 Key values pairs can also be uploaded.
 
 ```
-aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment" 
+aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment"
 ```
 
 ## Options
 
 ### `bucket`
 
-An s3 bucket to look for secrets in. 
+An s3 bucket to look for secrets in.
 
 ## License
 
