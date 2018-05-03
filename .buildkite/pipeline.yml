@@ -1,0 +1,11 @@
+steps:
+  - label: ":bash: :hammer:"
+    plugins:
+      docker-compose#v1.3.2:
+        run: tests
+
+  - label: "㊙️ git-credentials test"
+    command: .buildkite/test_credentials.sh
+    plugins:
+      ${BUILDKITE_REPO}#${BUILDKITE_COMMIT}:
+        bucket: "${TEST_BUCKET}"

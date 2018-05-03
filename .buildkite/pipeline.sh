@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -eu
 
 # If you build HEAD the pipeline.sh step, because it runs first, won't yet
@@ -9,19 +10,6 @@ else
   commit="${BUILDKITE_COMMIT}"
 fi
 
-# We have to use cat because pipeline.yml $ interpolation doesn't work in YAML
-# keys, only values
+export BUILDKITE_COMMIT="$commit"
 
-cat <<YAML
-steps:
-  - label: ":bash: :hammer:"
-    plugins:
-      docker-compose#v1.3.2:
-        run: tests
-
-  - label: "㊙️ git-credentials test"
-    command: .buildkite/test_credentials.sh
-    plugins:
-      s3-secrets#${commit}:
-        bucket: buildkite-agents-elastic-secrets
-YAML
+buildkite-agent pipeline upload .buildkite/pipeline.yml
