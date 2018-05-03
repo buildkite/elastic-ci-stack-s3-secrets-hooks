@@ -4,6 +4,11 @@ steps:
       docker-compose#v1.3.2:
         run: tests
 
+  - label: ":sparkles: Lint"
+    plugins:
+      plugin-linter#v1.0.0:
+        name: s3-secrets
+
   - label: "㊙️ git-credentials test"
     command: .buildkite/test_credentials.sh
     plugins:
