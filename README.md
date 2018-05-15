@@ -1,6 +1,6 @@
 # AWS S3 Secrets Buildkite Plugin
 
-A [Buildkite plugin](https://buildkite.com/docs/agent/v3/plugins) to expose secrets to build steps via Amazon S3 (encrypted-at-rest).
+A set of agent hooks thta expose secrets to build steps via Amazon S3 (encrypted-at-rest). Used in the [Elastic CI Stack for AWS](https://github.com/buildkite/elastic-ci-stack-for-aws).
 
 Different types of secrets are supported and exposed to your builds in appropriate ways:
 
@@ -10,7 +10,7 @@ Different types of secrets are supported and exposed to your builds in appropria
 
 ## Installation
 
-This plugin needs to be installed directly in the agent so that secrets can be downloaded before jobs attempt checking out your repository. We are going to assume that buildkite has been installed at `/buildkite`, but this will vary depending on your operating system. Change the instructions accordingly.
+The hooks needs to be installed directly in the agent so that secrets can be downloaded before jobs attempt checking out your repository. We are going to assume that buildkite has been installed at `/buildkite`, but this will vary depending on your operating system. Change the instructions accordingly.
 
 ```
 # clone to a path your buildkite-agent can access
