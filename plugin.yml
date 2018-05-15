@@ -1,0 +1,14 @@
+name: s3-secrets
+description: Expose build secrets stored in s3 to your jobs
+author: https://github.com/lox
+requirements:
+  - curl
+  - bash
+  - aws
+configuration:
+  properties:
+    bucket:
+      type: string
+  required:
+    - bucket
+  additionalProperties: false
