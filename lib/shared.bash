@@ -4,6 +4,7 @@ s3_exists() {
   local bucket="$1"
   local key="$2"
   local aws_s3_args=("--region=$AWS_DEFAULT_REGION")
+  [[ ! -z "${AWS_ENDPOINT_URL+x}" ]] && aws_s3_args+=("--endpoint-url=$AWS_ENDPOINT_URL")
 
   if ! aws s3api head-object "${aws_s3_args[@]}" --bucket "$bucket" --key "$key" &>/dev/null ; then
     return 1
@@ -12,7 +13,9 @@ s3_exists() {
 
 s3_bucket_exists() {
   local bucket="$1"
-  if aws s3api head-bucket --bucket "$bucket" 2>&1 | grep -q "Not Found" ; then
+  local aws_s3_args=()
+  [[ ! -z "${AWS_ENDPOINT_URL+x}" ]] && aws_s3_args+=("--endpoint-url=$AWS_ENDPOINT_URL")
+  if aws s3api head-bucket "${aws_s3_args[@]}" --bucket "$bucket" 2>&1 | grep -q "Not Found" ; then
     return 1
   fi
 }
@@ -21,6 +24,7 @@ s3_download() {
   local bucket="$1"
   local key="$2"
   local aws_s3_args=("--quiet" "--region=$AWS_DEFAULT_REGION")
+  [[ ! -z "${AWS_ENDPOINT_URL+x}" ]] && aws_s3_args+=("--endpoint-url=$AWS_ENDPOINT_URL")
 
   if [[ "${BUILDKITE_USE_KMS:-true}" =~ ^(true|1)$ ]] ; then
     aws_s3_args+=("--sse" "aws:kms")
