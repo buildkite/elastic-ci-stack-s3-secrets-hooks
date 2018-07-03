@@ -12,7 +12,7 @@ s3_exists() {
 
 s3_bucket_exists() {
   local bucket="$1"
-  if aws s3api head-bucket --bucket "$bucket" 2>&1 | grep -q "Not Found" ; then
+  if ! aws s3api head-bucket --bucket "$bucket" &>/dev/null ; then
     return 1
   fi
 }

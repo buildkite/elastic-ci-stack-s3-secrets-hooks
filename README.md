@@ -17,7 +17,7 @@ The hooks needs to be installed directly in the agent so that secrets can be dow
 git clone https://github.com/buildkite-plugins/s3-secrets-buildkite-plugin.git /buildkite/s3_secrets
 ```
 
-Modify your agent's global hooks (see https://buildkite.com/docs/agent/v3/hooks#global-hooks):
+Modify your agent's global hooks (see [https://buildkite.com/docs/agent/v3/hooks#global-hooks](https://buildkite.com/docs/agent/v3/hooks#global-hooks)):
 
 ### `${BUILDKITE_ROOT}/hooks/environment`
 
@@ -45,10 +45,10 @@ When run via the agent environment and pre-exit hook, your builds will check in 
 
 
 * `s3://{bucket_name}/{pipeline}/ssh_private_key`
-* `s3://{bucket_name}/{pipeline}/environment`
+* `s3://{bucket_name}/{pipeline}/environment` or `s3://{bucket_name}/{pipeline}/env`
 * `s3://{bucket_name}/{pipeline}/git-credentials`
 * `s3://{bucket_name}/ssh_private_key`
-* `s3://{bucket_name}/environment`
+* `s3://{bucket_name}/environment` or `s3://{bucket_name}/env`
 * `s3://{bucket_name}/git-credentials`
 
 The private key is exposed to both the checkout and the command as an ssh-agent instance. The secrets in the env file are exposed as environment variables.
