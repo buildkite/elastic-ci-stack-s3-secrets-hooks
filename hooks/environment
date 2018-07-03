@@ -86,7 +86,7 @@ if [[ -n "$s3_bucket" ]] ; then
 
   if [[ "${#git_credentials[@]}" -gt 0 ]] ; then
     export GIT_CONFIG_PARAMETERS
-    GIT_CONFIG_PARAMETERS=$( IFS=' '; echo -n "${git_credentials[*]}" ) 
+    GIT_CONFIG_PARAMETERS=$( IFS=' '; echo -n "${git_credentials[*]}" )
   fi
 
   if [[ "${BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV:-}" =~ ^(true|1)$ ]] ; then
