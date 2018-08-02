@@ -38,7 +38,7 @@ generate_file_list() {
     "s3api head-object --region=us-east-1 --bucket my_secrets_bucket --key test/git-credentials : exit 1"
 
   stub ssh-add \
-    "echo added ssh key"
+    "- : echo added ssh key"
 
   run bash -c "$PWD/hooks/environment && $PWD/hooks/pre-exit"
 
