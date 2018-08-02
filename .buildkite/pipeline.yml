@@ -6,6 +6,3 @@ steps:
 
   - label: "㊙️ git-credentials test"
     command: .buildkite/test_credentials.sh
-    plugins:
-      ${BUILDKITE_REPO}#${BUILDKITE_COMMIT}:
-        bucket: "${TEST_BUCKET}"
