@@ -79,7 +79,7 @@ https://user:password@host/path/to/repo
 ```
 
 ```
-aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host/path/to/repo") "s3://${secrets_bucket}/git-credentials"
+echo "https://user:password@host/path/to/repo" | aws s3 cp --acl private --sse aws:kms - "s3://${secrets_bucket}/git-credentials"
 ```
 
 These are then exposed via a [gitcredential helper](https://git-scm.com/docs/gitcredentials) which will download the
