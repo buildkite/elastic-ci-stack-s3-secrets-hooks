@@ -28,14 +28,14 @@ s3_bucket_exists() {
 s3_download() {
   local bucket="$1"
   local key="$2"
-  local aws_s3_args=("--quiet" "--region=$AWS_DEFAULT_REGION")
+  local aws_s3_args=("--only-show-errors" "--region=$AWS_DEFAULT_REGION")
 
   if [[ "${BUILDKITE_USE_KMS:-true}" =~ ^(true|1)$ ]] ; then
     aws_s3_args+=("--sse" "aws:kms")
   fi
 
-  if ! aws s3 cp "${aws_s3_args[@]}" "s3://$1/$2" - ; then
-    exit 1
+  if ! aws s3 cp "${aws_s3_args[@]}" "s3://${bucket}/${key}" - ; then
+    return 1
   fi
 }
 
