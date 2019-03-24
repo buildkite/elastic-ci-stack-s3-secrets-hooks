@@ -5,11 +5,12 @@ s3_exists() {
   local key="$2"
   local aws_s3_args=("--region=$AWS_DEFAULT_REGION")
 
-  output=$(aws s3api head-object "${aws_s3_args[@]}" --bucket "$bucket" --key "$key" 1>/dev/null)
+  # capture just stderr
+  output=$(aws s3api head-object "${aws_s3_args[@]}" --bucket "$bucket" --key "$key" 2>&1 >/dev/null)
   exitcode=$?
 
   # If we didn't get a Not Found or Forbidden then show the error and return exit code 2
-  if [[ $exitcode -ne 0 && "$output" =~ (Not Found|Forbidden)$ ]] ; then
+  if [[ $exitcode -ne 0 && ! $output =~ (Not Found|Forbidden)$ ]] ; then
     echo "$output" >&2
     return 2
   elif [[ $exitcode -ne 0 ]] ; then
