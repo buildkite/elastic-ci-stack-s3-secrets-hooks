@@ -5,7 +5,15 @@ s3_exists() {
   local key="$2"
   local aws_s3_args=("--region=$AWS_DEFAULT_REGION")
 
-  if ! aws s3api head-object "${aws_s3_args[@]}" --bucket "$bucket" --key "$key" &>/dev/null ; then
+  # capture just stderr
+  output=$(aws s3api head-object "${aws_s3_args[@]}" --bucket "$bucket" --key "$key" 2>&1 >/dev/null)
+  exitcode=$?
+
+  # If we didn't get a Not Found or Forbidden then show the error and return exit code 2
+  if [[ $exitcode -ne 0 && ! $output =~ (Not Found|Forbidden)$ ]] ; then
+    echo "$output" >&2
+    return 2
+  elif [[ $exitcode -ne 0 ]] ; then
     return 1
   fi
 }
@@ -20,14 +28,14 @@ s3_bucket_exists() {
 s3_download() {
   local bucket="$1"
   local key="$2"
-  local aws_s3_args=("--quiet" "--region=$AWS_DEFAULT_REGION")
+  local aws_s3_args=("--only-show-errors" "--region=$AWS_DEFAULT_REGION")
 
   if [[ "${BUILDKITE_USE_KMS:-true}" =~ ^(true|1)$ ]] ; then
     aws_s3_args+=("--sse" "aws:kms")
   fi
 
-  if ! aws s3 cp "${aws_s3_args[@]}" "s3://$1/$2" - ; then
-    exit 1
+  if ! aws s3 cp "${aws_s3_args[@]}" "s3://${bucket}/${key}" - ; then
+    return 1
   fi
 }
 
