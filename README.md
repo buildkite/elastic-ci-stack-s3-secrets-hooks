@@ -1,6 +1,6 @@
 # AWS S3 Secrets Buildkite Plugin
 
-A set of agent hooks thta expose secrets to build steps via Amazon S3 (encrypted-at-rest). Used in the [Elastic CI Stack for AWS](https://github.com/buildkite/elastic-ci-stack-for-aws).
+A set of agent hooks that expose secrets to build steps via Amazon S3 (encrypted-at-rest). Used in the [Elastic CI Stack for AWS](https://github.com/buildkite/elastic-ci-stack-for-aws).
 
 Different types of secrets are supported and exposed to your builds in appropriate ways:
 
