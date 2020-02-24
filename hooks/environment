@@ -45,9 +45,10 @@ if [[ -n "$s3_bucket" ]] ; then
     fi
   done
 
-  if [[ -z "${key_found:-}" ]] && [[ "${BUILDKITE_REPO:-}" =~ ^git ]] ; then
-    echo "+++ :warning: Failed to find an SSH key in secret bucket" >&2;
-    exit 1
+  if [[ -z "${key_found:-}" ]] && [[ "${BUILDKITE_REPO:-}" =~ ^git@ ]] ; then
+    echo >&2 "+++ :warning: Failed to find an SSH key in secret bucket"
+    echo >&2 "The repository '$BUILDKITE_REPO' appears to use SSH for transport, but the elastic-ci-stack-s3-secrets-hooks plugin did not find any SSH keys in the $s3_bucket S3 bucket."
+    echo >&2 "See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information."
   fi
 
   env_paths=(
