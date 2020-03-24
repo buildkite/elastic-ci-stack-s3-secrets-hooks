@@ -7,6 +7,10 @@ basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 # shellcheck disable=SC1090
 . "$basedir/lib/shared.bash"
 
+# For resiliency, increase the number of attempts to retrieve credentials for IAM roles
+# The default value is 1
+export AWS_METADATA_SERVICE_NUM_ATTEMPTS=3
+
 TMPDIR=${TMPDIR:-/tmp}
 AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
 
