@@ -12,7 +12,7 @@ Different types of secrets are supported and exposed to your builds in appropria
 
 The hooks needs to be installed directly in the agent so that secrets can be downloaded before jobs attempt checking out your repository. We are going to assume that buildkite has been installed at `/buildkite`, but this will vary depending on your operating system. Change the instructions accordingly.
 
-```
+```bash
 # clone to a path your buildkite-agent can access
 git clone https://github.com/buildkite-plugins/s3-secrets-buildkite-plugin.git /buildkite/s3_secrets
 ```
@@ -43,13 +43,12 @@ fi
 
 When run via the agent environment and pre-exit hook, your builds will check in the s3 secrets bucket you created for secrets files in the following formats:
 
-
-* `s3://{bucket_name}/{pipeline}/ssh_private_key`
-* `s3://{bucket_name}/{pipeline}/environment` or `s3://{bucket_name}/{pipeline}/env`
-* `s3://{bucket_name}/{pipeline}/git-credentials`
-* `s3://{bucket_name}/ssh_private_key`
-* `s3://{bucket_name}/environment` or `s3://{bucket_name}/env`
-* `s3://{bucket_name}/git-credentials`
+- `s3://{bucket_name}/{pipeline}/private_ssh_key`
+- `s3://{bucket_name}/{pipeline}/environment` or `s3://{bucket_name}/{pipeline}/env`
+- `s3://{bucket_name}/{pipeline}/git-credentials`
+- `s3://{bucket_name}/private_ssh_key`
+- `s3://{bucket_name}/environment` or `s3://{bucket_name}/env`
+- `s3://{bucket_name}/git-credentials`
 
 The private key is exposed to both the checkout and the command as an ssh-agent instance. The secrets in the env file are exposed as environment variables.
 
@@ -74,11 +73,11 @@ Note the `-sse aws:kms`, as without this your secrets will fail to download.
 
 For git over https, you can use a `git-credentials` file with credential urls in the format of:
 
-```
+```bash
 https://user:password@host/path/to/repo
 ```
 
-```
+```bash
 aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host/path/to/repo") "s3://${secrets_bucket}/git-credentials"
 ```
 
@@ -89,7 +88,7 @@ credentials as needed.
 
 Key values pairs can also be uploaded.
 
-```
+```bash
 aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment"
 ```
 
