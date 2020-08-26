@@ -65,6 +65,7 @@ if [[ -n "$s3_bucket" ]] ; then
   env_before="$(env | sort)"
 
   for key in ${env_paths[*]} ; do
+    echo "Checking ${key}" >&2
     if s3_exists "$s3_bucket" "$key" ; then
       echo "Downloading env file from ${key}" >&2;
       if ! envscript=$(s3_download "${s3_bucket}" "$key") ; then
@@ -75,6 +76,9 @@ if [[ -n "$s3_bucket" ]] ; then
       set -o allexport
       eval "$envscript"
       set +o allexport
+    elif [[ $? -eq 2 ]] ; then
+      echo "+++ :warning: Failed to check if $key exists" >&2;
+      exit 1
     fi
   done
 
