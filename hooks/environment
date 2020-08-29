@@ -78,7 +78,6 @@ if [[ -n "$s3_bucket" ]] ; then
       set +o allexport
     elif [[ $? -eq 2 ]] ; then
       echo "+++ :warning: Failed to check if $key exists" >&2;
-      exit 1
     fi
   done
 
