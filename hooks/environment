@@ -44,7 +44,7 @@ if [[ -n "$s3_bucket" ]] ; then
       add_ssh_private_key_to_agent "$ssh_key"
       key_found=1
     elif [[ $? -eq 2 ]] ; then
-      echo "+++ :warning: Failed to check if $key exists" >&2;
+      echo "Failed to check if $key exists" >&2;
       exit 1
     fi
   done
