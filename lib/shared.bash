@@ -50,7 +50,3 @@ add_ssh_private_key_to_agent() {
   echo "Loading ssh-key into ssh-agent (pid ${SSH_AGENT_PID:-})" >&2;
   echo "$ssh_key" | env SSH_ASKPASS="/bin/false" ssh-add -
 }
-
-grep_secrets() {
-  grep -E 'private_ssh_key|id_rsa_github|env|environment|git-credentials$' "$@"
-}
