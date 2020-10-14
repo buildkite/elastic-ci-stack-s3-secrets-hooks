@@ -23,6 +23,11 @@ fi
 
 echo "~~~ Downloading secrets from :s3: $s3_bucket" >&2;
 
+echo "Attempting to preload IAM credentials from Instance Metadata Service" >&2
+if ! imds_load_credentials; then
+  echo "Failed to preload IAM credentials" >&2
+fi
+
 if ! s3_bucket_exists "$s3_bucket" ; then
   echo "+++ :warning: Bucket $s3_bucket doesn't exist" >&2;
   exit 1
