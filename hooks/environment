@@ -92,6 +92,7 @@ git_credentials_paths=(
 git_credentials=()
 
 for key in ${git_credentials_paths[*]} ; do
+  echo "Checking ${key}" >&2
   if s3_exists "$s3_bucket" "$key" ; then
     echo "Adding git-credentials in $key as a credential helper" >&2;
     git_credentials+=("'credential.helper=$basedir/git-credential-s3-secrets ${s3_bucket} ${key}'")
