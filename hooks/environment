@@ -34,9 +34,23 @@ ssh_key_paths=(
   "private_ssh_key"
   "id_rsa_github"
 )
+env_paths=(
+  "env"
+  "environment"
+  "${s3_bucket_prefix}/env"
+  "${s3_bucket_prefix}/environment"
+)
+git_credentials_paths=(
+  "git-credentials"
+  "${s3_bucket_prefix}/git-credentials"
+)
+
+s3_exists_preload "$s3_bucket" \
+  "${ssh_key_paths[@]}" \
+  "${env_paths[@]}" \
+  "${git_credentials_paths[@]}"
 
 for key in ${ssh_key_paths[*]} ; do
-  echo "Checking ${key}" >&2
   if s3_exists "$s3_bucket" "$key" ; then
     echo "Found ${key}, downloading" >&2;
     if ! ssh_key=$(s3_download "${s3_bucket}" "$key") ; then
@@ -58,17 +72,9 @@ if [[ -z "${key_found:-}" ]] && [[ "${BUILDKITE_REPO:-}" =~ ^git@ ]] ; then
   echo >&2 "See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information."
 fi
 
-env_paths=(
-  "env"
-  "environment"
-  "${s3_bucket_prefix}/env"
-  "${s3_bucket_prefix}/environment"
-)
-
 env_before="$(env | sort)"
 
 for key in ${env_paths[*]} ; do
-  echo "Checking ${key}" >&2
   if s3_exists "$s3_bucket" "$key" ; then
     echo "Downloading env file from ${key}" >&2;
     if ! envscript=$(s3_download "${s3_bucket}" "$key") ; then
@@ -83,11 +89,6 @@ for key in ${env_paths[*]} ; do
     echo "Failed to check if $key exists" >&2;
   fi
 done
-
-git_credentials_paths=(
-  "git-credentials"
-  "${s3_bucket_prefix}/git-credentials"
-)
 
 git_credentials=()
 
