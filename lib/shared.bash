@@ -93,6 +93,10 @@ imds_credentials_to_env() {
 }
 
 imds_load_credentials() {
+  if [[ -n $AWS_ACCESS_KEY_ID ]]; then
+    echo >&2 "AWS_ACCESS_KEY_ID already set, not loading from Instance Metadata Service"
+    return 0
+  fi
   if ! imds_get_token; then return 1; fi
   local role; role=$(imds_get iam/security-credentials | head -n1)
   if [[ -z $role ]]; then
