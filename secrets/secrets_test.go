@@ -64,28 +64,46 @@ func TestRun(t *testing.T) {
 		"bkt/environment":          {nil, errors.New("Forbidden")}, // TODO: error type
 		"bkt/pipeline/env":         {nil, errors.New("NotFound")},  // TODO: error type
 		"bkt/pipeline/environment": {[]byte("C=three"), nil},
+
+		"bkt/git-credentials":          {[]byte("general git key"), nil},
+		"bkt/pipeline/git-credentials": {[]byte("pipeline git key"), nil},
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
-		Repo:     "git@github.com:buildkite/bash-example.git",
-		Bucket:   "bkt",
-		Prefix:   "pipeline",
-		Logger:   log.New(logbuf, "", log.LstdFlags),
-		Client:   &FakeClient{t: t, data: fakeData},
-		SSHAgent: fakeAgent,
-		EnvSink:  envSink,
+		Repo:                "git@github.com:buildkite/bash-example.git",
+		Bucket:              "bkt",
+		Prefix:              "pipeline",
+		Logger:              log.New(logbuf, "", log.LstdFlags),
+		Client:              &FakeClient{t: t, data: fakeData},
+		SSHAgent:            fakeAgent,
+		EnvSink:             envSink,
+		GitCredentialHelper: "/path/to/git-credential-s3-secrets",
 	}
 	if err := secrets.Run(conf); err != nil {
 		t.Error(err)
 	}
+
+	// verify ssh-agent
 	assertDeepEqual(t, []string{"pipeline key", "general key"}, fakeAgent.keys)
-	if expect, actual := "A=one\nB=two\nC=three\n", envSink.String(); expect != actual {
-		t.Errorf("expected %q written to env, got %q", expect, actual)
+
+	// verify env
+	gitCredentialHelpers := strings.Join([]string{
+		"'credential.helper=/path/to/git-credential-s3-secrets bkt git-credentials'",
+		"'credential.helper=/path/to/git-credential-s3-secrets bkt pipeline/git-credentials'",
+	}, " ") + "\n"
+	expected := strings.Join([]string{
+		"A=one",
+		"B=two",
+		"C=three",
+		"GIT_CONFIG_PARAMETERS=" + gitCredentialHelpers,
+	}, "\n")
+	if actual := envSink.String(); expected != actual {
+		t.Errorf("unexpected env written:\n-%q\n+%q", expected, actual)
 	}
-	t.Logf("log:\n%s", logbuf.String())
+	t.Logf("hook log:\n%s", logbuf.String())
 }
 
 func TestNoneFound(t *testing.T) {
@@ -114,7 +132,7 @@ func TestNoneFound(t *testing.T) {
 	if !strings.Contains(logbuf.String(), expectedWarning) {
 		t.Error("expected warning about no SSH keys for git@... repo")
 	}
-	t.Logf("logbuf:\n%s", logbuf.String())
+	t.Logf("hook log:\n%s", logbuf.String())
 }
 
 func assertDeepEqual(t *testing.T, expected, actual interface{}) {

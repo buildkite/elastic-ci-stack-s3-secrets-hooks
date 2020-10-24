@@ -43,6 +43,9 @@ type Config struct {
 
 	// EnvSink has the contents of environment files written to it
 	EnvSink io.Writer
+
+	// GitCredentialHelper is the path to git-credential-s3-secrets
+	GitCredentialHelper string
 }
 
 // Run is the programmatic (as opposed to CLI) entrypoint to all
@@ -68,10 +71,16 @@ func Run(conf Config) error {
 	resultsEnv := make(chan getResult)
 	getEnvs(conf, resultsEnv)
 
+	resultsGit := make(chan getResult)
+	getGitCredentials(conf, resultsGit)
+
 	if err := handleSSHKeys(conf, resultsSSH); err != nil {
 		return err
 	}
 	if err := handleEnvs(conf, resultsEnv); err != nil {
+		return err
+	}
+	if err := handleGitCredentials(conf, resultsGit); err != nil {
 		return err
 	}
 	return nil
@@ -84,9 +93,9 @@ func getSSHKeys(conf Config, results chan<- getResult) {
 		"private_ssh_key",
 		"id_rsa_github",
 	}
-	log.Printf("Trying to download from S3:")
+	conf.Logger.Printf("Checking S3 for SSH keys:")
 	for _, k := range keys {
-		log.Printf("- %s", k)
+		conf.Logger.Printf("- %s", k)
 	}
 	go GetAll(conf.Client, conf.Bucket, keys, results)
 }
@@ -98,9 +107,21 @@ func getEnvs(conf Config, results chan<- getResult) {
 		conf.Prefix + "/env",
 		conf.Prefix + "/environment",
 	}
-	log.Printf("Trying to download from S3:")
+	conf.Logger.Printf("Checking S3 for environment files:")
 	for _, k := range keys {
-		log.Printf("- %s", k)
+		conf.Logger.Printf("- %s", k)
+	}
+	go GetAll(conf.Client, conf.Bucket, keys, results)
+}
+
+func getGitCredentials(conf Config, results chan<- getResult) {
+	keys := []string{
+		"git-credentials",
+		conf.Prefix + "/git-credentials",
+	}
+	conf.Logger.Printf("Checking S3 for git credentials:")
+	for _, k := range keys {
+		conf.Logger.Printf("- %s", k)
 	}
 	go GetAll(conf.Client, conf.Bucket, keys, results)
 }
@@ -147,10 +168,34 @@ func handleEnvs(conf Config, results <-chan getResult) error {
 			data = append(data, '\n')
 		}
 		log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
-		// TODO: consider a mutex on EnvSink?
+		// TODO: mutex on EnvSink
 		if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
 			return fmt.Errorf("copying env: %w", err)
 		}
+	}
+	return nil
+}
+
+func handleGitCredentials(conf Config, results <-chan getResult) error {
+	log := conf.Logger
+	var helpers []string
+	for r := range results {
+		if r.err != nil {
+			continue
+		}
+		log.Printf("Adding git-credentials in %s/%s as a credential helper", r.bucket, r.key)
+		helpers = append(helpers, fmt.Sprintf(
+			"'credential.helper=%s %s %s'",
+			conf.GitCredentialHelper, r.bucket, r.key,
+		))
+	}
+	if len(helpers) == 0 {
+		return nil
+	}
+	env := "GIT_CONFIG_PARAMETERS=" + strings.Join(helpers, " ") + "\n"
+	// TODO: mutex on EnvSink
+	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
+		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
 	}
 	return nil
 }
