@@ -3,6 +3,7 @@ package secrets_test
 import (
 	"bytes"
 	"errors"
+	"log"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -59,45 +60,45 @@ func TestRun(t *testing.T) {
 		"bkt/private_ssh_key":          {[]byte("general key"), nil},
 		"bkt/id_rsa_github":            {nil, errors.New("Forbidden")}, // TODO: error type
 	}
-	stderr := &bytes.Buffer{}
+	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
 
 	conf := secrets.Config{
-		Repo:      "git@github.com:buildkite/bash-example.git",
-		Bucket:    "bkt",
-		Prefix:    "pipeline",
-		LogWriter: stderr,
-		Client:    &FakeClient{t: t, data: fakeData},
-		SSHAgent:  fakeAgent,
+		Repo:     "git@github.com:buildkite/bash-example.git",
+		Bucket:   "bkt",
+		Prefix:   "pipeline",
+		Logger:   log.New(logbuf, "", log.LstdFlags),
+		Client:   &FakeClient{t: t, data: fakeData},
+		SSHAgent: fakeAgent,
 	}
 	if err := secrets.Run(conf); err != nil {
 		t.Error(err)
 	}
 	assertDeepEqual(t, []string{"pipeline key", "general key"}, fakeAgent.keys)
-	t.Logf("stderr:\n%s", stderr.String())
+	t.Logf("log:\n%s", logbuf.String())
 }
 
 func TestNoneFound(t *testing.T) {
 	fakeData := map[string]FakeObject{}
-	stderr := &bytes.Buffer{}
+	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t, keys: []string{}}
 	conf := secrets.Config{
-		Repo:      "git@github.com:buildkite/bash-example.git",
-		Bucket:    "bkt",
-		Prefix:    "pipeline",
-		LogWriter: stderr,
-		Client:    &FakeClient{t: t, data: fakeData},
-		SSHAgent:  fakeAgent,
+		Repo:     "git@github.com:buildkite/bash-example.git",
+		Bucket:   "bkt",
+		Prefix:   "pipeline",
+		Logger:   log.New(logbuf, "", log.LstdFlags),
+		Client:   &FakeClient{t: t, data: fakeData},
+		SSHAgent: fakeAgent,
 	}
 	if err := secrets.Run(conf); err != nil {
 		t.Error(err)
 	}
 	assertDeepEqual(t, []string{}, fakeAgent.keys)
 	expectedWarning := "+++ :warning: Failed to find an SSH key in secret bucket"
-	if !strings.Contains(stderr.String(), expectedWarning) {
+	if !strings.Contains(logbuf.String(), expectedWarning) {
 		t.Error("expected warning about no SSH keys for git@... repo")
 	}
-	t.Logf("stderr:\n%s", stderr.String())
+	t.Logf("logbuf:\n%s", logbuf.String())
 }
 
 func assertDeepEqual(t *testing.T, expected, actual interface{}) {

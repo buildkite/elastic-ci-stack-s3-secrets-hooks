@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"strings"
 )
@@ -34,8 +33,8 @@ type Config struct {
 	// Client for S3
 	Client Client
 
-	// LogWriter is an io.Writer sink for the logger
-	LogWriter io.Writer
+	// Logger is expected to output to stderr
+	Logger *log.Logger
 
 	// SSHAgent represents an ssh-agent process
 	SSHAgent Agent
@@ -46,56 +45,62 @@ type Config struct {
 // etc.
 func Run(conf Config) error {
 	bucket := conf.Bucket
-	prefix := conf.Prefix
-	client := conf.Client
-	logger := log.New(conf.LogWriter, "", log.LstdFlags)
-	agent := conf.SSHAgent
+	log := conf.Logger
 
-	logger.Printf("~~~ Downloading secrets from :s3: %s", bucket)
+	log.Printf("~~~ Downloading secrets from :s3: %s", bucket)
 
-	if ok, err := client.BucketExists(bucket); !ok {
-		logger.Printf("+++ :warning: Bucket %q doesn't exist", bucket)
+	if ok, err := conf.Client.BucketExists(bucket); !ok {
+		log.Printf("+++ :warning: Bucket %q doesn't exist", bucket)
 		if err != nil {
-			logger.Println(err)
+			log.Println(err)
 		}
 		return fmt.Errorf("bucket %q not found", bucket)
 	}
 
 	keys := []string{
-		prefix + "/private_ssh_key",
-		prefix + "/id_rsa_github",
+		conf.Prefix + "/private_ssh_key",
+		conf.Prefix + "/id_rsa_github",
 		"private_ssh_key",
 		"id_rsa_github",
 	}
-	logger.Printf("Trying to download from S3:")
+	log.Printf("Trying to download from S3:")
 	for _, k := range keys {
-		logger.Printf("- %s", k)
+		log.Printf("- %s", k)
 	}
-	keyFound := false
 	results := make(chan getResult)
-	go GetAll(client, bucket, keys, results)
-	for res := range results {
-		if res.err != nil {
+	go GetAll(conf.Client, bucket, keys, results)
+	handleSSHKeys(conf, results)
+	return nil
+}
+
+func handleSSHKeys(conf Config, results <-chan getResult) error {
+	log := conf.Logger
+	keyFound := false
+	for r := range results {
+		if r.err != nil {
 			// TODO: silently ignore NotFound & Forbidden errors
-			logger.Printf("+++ :warning: Failed to download ssh-key %s/%s: %v", bucket, res.key, res.err)
+			log.Printf(
+				"+++ :warning: Failed to download ssh-key %s/%s: %v",
+				r.bucket, r.key, r.err,
+			)
 			continue
 		}
-		logger.Printf(
+		log.Printf(
 			"Loading %s/%s (%d bytes) into ssh-agent (pid %d)",
-			res.bucket,
-			res.key,
-			len(res.data),
-			agent.Pid(),
+			r.bucket, r.key, len(r.data), conf.SSHAgent.Pid(),
 		)
-		if err := agent.Add(res.data); err != nil {
+		if err := conf.SSHAgent.Add(r.data); err != nil {
 			return fmt.Errorf("ssh-agent add: %w", err)
 		}
 		keyFound = true
 	}
 	if !keyFound && strings.HasPrefix(conf.Repo, "git@") {
-		logger.Println("+++ :warning: Failed to find an SSH key in secret bucket")
-		logger.Println("The repository '$BUILDKITE_REPO' appears to use SSH for transport, but the elastic-ci-stack-s3-secrets-hooks plugin did not find any SSH keys in the $s3_bucket S3 bucket.")
-		logger.Println("See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information.")
+		log.Printf("+++ :warning: Failed to find an SSH key in secret bucket")
+		log.Printf(
+			"The repository %q appears to use SSH for transport, but the elastic-ci-stack-s3-secrets-hooks plugin did not find any SSH keys in the %q S3 bucket.",
+			conf.Repo, conf.Bucket,
+		)
+		log.Printf("See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information.")
 	}
 	return nil
 }
