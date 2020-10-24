@@ -58,11 +58,12 @@ func Run(conf Config) error {
 	log.Printf("~~~ Downloading secrets from :s3: %s", bucket)
 
 	if ok, err := conf.Client.BucketExists(bucket); !ok {
-		log.Printf("+++ :warning: Bucket %q doesn't exist", bucket)
 		if err != nil {
-			log.Println(err)
+			log.Printf("+++ :warning: Bucket %q not found: %v", bucket, err)
+		} else {
+			log.Printf("+++ :warning: Bucket %q doesn't exist", bucket)
 		}
-		return fmt.Errorf("bucket %q not found", bucket)
+		return fmt.Errorf("S3 bucket %q not found", bucket)
 	}
 
 	resultsSSH := make(chan getResult)
