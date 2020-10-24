@@ -1,7 +1,9 @@
 package secrets
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"strings"
 )
@@ -38,6 +40,9 @@ type Config struct {
 
 	// SSHAgent represents an ssh-agent process
 	SSHAgent Agent
+
+	// EnvSink has the contents of environment files written to it
+	EnvSink io.Writer
 }
 
 // Run is the programmatic (as opposed to CLI) entrypoint to all
@@ -57,6 +62,22 @@ func Run(conf Config) error {
 		return fmt.Errorf("bucket %q not found", bucket)
 	}
 
+	resultsSSH := make(chan getResult)
+	getSSHKeys(conf, resultsSSH)
+
+	resultsEnv := make(chan getResult)
+	getEnvs(conf, resultsEnv)
+
+	if err := handleSSHKeys(conf, resultsSSH); err != nil {
+		return err
+	}
+	if err := handleEnvs(conf, resultsEnv); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getSSHKeys(conf Config, results chan<- getResult) {
 	keys := []string{
 		conf.Prefix + "/private_ssh_key",
 		conf.Prefix + "/id_rsa_github",
@@ -67,10 +88,21 @@ func Run(conf Config) error {
 	for _, k := range keys {
 		log.Printf("- %s", k)
 	}
-	results := make(chan getResult)
-	go GetAll(conf.Client, bucket, keys, results)
-	handleSSHKeys(conf, results)
-	return nil
+	go GetAll(conf.Client, conf.Bucket, keys, results)
+}
+
+func getEnvs(conf Config, results chan<- getResult) {
+	keys := []string{
+		"env",
+		"environment",
+		conf.Prefix + "/env",
+		conf.Prefix + "/environment",
+	}
+	log.Printf("Trying to download from S3:")
+	for _, k := range keys {
+		log.Printf("- %s", k)
+	}
+	go GetAll(conf.Client, conf.Bucket, keys, results)
 }
 
 func handleSSHKeys(conf Config, results <-chan getResult) error {
@@ -79,10 +111,7 @@ func handleSSHKeys(conf Config, results <-chan getResult) error {
 	for r := range results {
 		if r.err != nil {
 			// TODO: silently ignore NotFound & Forbidden errors
-			log.Printf(
-				"+++ :warning: Failed to download ssh-key %s/%s: %v",
-				r.bucket, r.key, r.err,
-			)
+			log.Printf("+++ :warning: Failed to download ssh-key %s/%s: %v", r.bucket, r.key, r.err)
 			continue
 		}
 		log.Printf(
@@ -101,6 +130,27 @@ func handleSSHKeys(conf Config, results <-chan getResult) error {
 			conf.Repo, conf.Bucket,
 		)
 		log.Printf("See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information.")
+	}
+	return nil
+}
+
+func handleEnvs(conf Config, results <-chan getResult) error {
+	log := conf.Logger
+	for r := range results {
+		if r.err != nil {
+			// TODO: silently ignore NotFound & Forbidden errors
+			log.Printf("+++ :warning: Failed to download env from %s/%s: %v", r.bucket, r.key, r.err)
+			continue
+		}
+		data := r.data
+		if data[len(data)-1] != '\n' {
+			data = append(data, '\n')
+		}
+		log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
+		// TODO: consider a mutex on EnvSink?
+		if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
+			return fmt.Errorf("copying env: %w", err)
+		}
 	}
 	return nil
 }

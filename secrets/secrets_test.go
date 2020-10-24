@@ -59,9 +59,15 @@ func TestRun(t *testing.T) {
 		"bkt/pipeline/id_rsa_github":   {[]byte("pipeline key"), nil},
 		"bkt/private_ssh_key":          {[]byte("general key"), nil},
 		"bkt/id_rsa_github":            {nil, errors.New("Forbidden")}, // TODO: error type
+
+		"bkt/env":                  {[]byte("A=one\nB=two"), nil},
+		"bkt/environment":          {nil, errors.New("Forbidden")}, // TODO: error type
+		"bkt/pipeline/env":         {nil, errors.New("NotFound")},  // TODO: error type
+		"bkt/pipeline/environment": {[]byte("C=three"), nil},
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
+	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
 		Repo:     "git@github.com:buildkite/bash-example.git",
@@ -70,11 +76,15 @@ func TestRun(t *testing.T) {
 		Logger:   log.New(logbuf, "", log.LstdFlags),
 		Client:   &FakeClient{t: t, data: fakeData},
 		SSHAgent: fakeAgent,
+		EnvSink:  envSink,
 	}
 	if err := secrets.Run(conf); err != nil {
 		t.Error(err)
 	}
 	assertDeepEqual(t, []string{"pipeline key", "general key"}, fakeAgent.keys)
+	if expect, actual := "A=one\nB=two\nC=three\n", envSink.String(); expect != actual {
+		t.Errorf("expected %q written to env, got %q", expect, actual)
+	}
 	t.Logf("log:\n%s", logbuf.String())
 }
 
@@ -82,6 +92,8 @@ func TestNoneFound(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t, keys: []string{}}
+	envSink := &bytes.Buffer{}
+
 	conf := secrets.Config{
 		Repo:     "git@github.com:buildkite/bash-example.git",
 		Bucket:   "bkt",
@@ -89,11 +101,15 @@ func TestNoneFound(t *testing.T) {
 		Logger:   log.New(logbuf, "", log.LstdFlags),
 		Client:   &FakeClient{t: t, data: fakeData},
 		SSHAgent: fakeAgent,
+		EnvSink:  envSink,
 	}
 	if err := secrets.Run(conf); err != nil {
 		t.Error(err)
 	}
 	assertDeepEqual(t, []string{}, fakeAgent.keys)
+	if envSink.Len() != 0 {
+		t.Errorf("expected envSink to be empty, got %q", envSink.String())
+	}
 	expectedWarning := "+++ :warning: Failed to find an SSH key in secret bucket"
 	if !strings.Contains(logbuf.String(), expectedWarning) {
 		t.Error("expected warning about no SSH keys for git@... repo")
