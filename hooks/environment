@@ -2,22 +2,12 @@
 set -e -o pipefail -u
 
 basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
-envsink="$basedir/env.fifo"
 credhelper="$basedir/git-credential-s3-secrets"
 
-remove_envsink() {
-  rm -f -- "$envsink"
-}
-remove_envsink
-mkfifo "$envsink"
-trap remove_envsink EXIT
+envscript="$(
+  BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER="$credhelper" ./elastic-ci-stack-s3-secrets-hooks
+)"
 
-BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK="$envsink" \
-  BUILDKITE_PLUGIN_S3_SECRETS_GIT_CREDENTIAL_HELPER="$credhelper" \
-  ./elastic-ci-stack-s3-secrets-hooks &
-
-envscript="$(cat "$envsink")"
-wait # for elastic-ci-stack-s3-secrets-hooks to finish
 env_before="$(env | sort)"
 echo "Evaluating ${#envscript} bytes of env"
 set -o allexport

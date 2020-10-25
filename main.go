@@ -15,8 +15,7 @@ const (
 	envPrefix     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
 	envPipeline   = "BUILDKITE_PIPELINE_SLUG"
 	envRepo       = "BUILDKITE_REPO"
-	envEnvSink    = "BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK"
-	envCredHelper = "BUILDKITE_PLUGIN_S3_SECRETS_GIT_CREDENTIAL_HELPER"
+	envCredHelper = "BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER"
 
 	envDefaultRegion = "AWS_DEFAULT_REGION"
 	defaultRegion    = "us-east-1"
@@ -54,15 +53,6 @@ func mainWithError(log *log.Logger) error {
 
 	agent := &sshagent.Agent{}
 
-	envSinkPath := os.Getenv(envEnvSink)
-	if envSinkPath == "" {
-		return fmt.Errorf("%s required", envEnvSink)
-	}
-	envSink, err := os.OpenFile(envSinkPath, os.O_WRONLY|os.O_APPEND, 0)
-	if err != nil {
-		return err
-	}
-
 	credHelper := os.Getenv(envCredHelper)
 	if credHelper == "" {
 		return fmt.Errorf("%s required", envCredHelper)
@@ -75,7 +65,7 @@ func mainWithError(log *log.Logger) error {
 		Client:              client,
 		Logger:              log,
 		SSHAgent:            agent,
-		EnvSink:             envSink,
+		EnvSink:             os.Stdout,
 		GitCredentialHelper: credHelper,
 	})
 }
