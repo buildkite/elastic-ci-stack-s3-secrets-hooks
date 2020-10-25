@@ -4,8 +4,10 @@ set -e -o pipefail -u
 basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 credhelper="$basedir/git-credential-s3-secrets"
 
+# elastic-ci-stack-s3-secrets-hooks must be in PATH
 envscript="$(
-  BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER="$credhelper" ./elastic-ci-stack-s3-secrets-hooks
+  BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER="$credhelper" \
+    elastic-ci-stack-s3-secrets-hooks
 )"
 
 env_before="$(env | sort)"
