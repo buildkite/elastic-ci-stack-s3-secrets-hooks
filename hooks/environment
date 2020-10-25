@@ -14,10 +14,10 @@ trap remove_envsink EXIT
 
 BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK="$envsink" \
   BUILDKITE_PLUGIN_S3_SECRETS_GIT_CREDENTIAL_HELPER="$credhelper" \
-  ./loader &
+  ./elastic-ci-stack-s3-secrets-hooks &
 
 envscript="$(cat "$envsink")"
-wait # for loader to finish
+wait # for elastic-ci-stack-s3-secrets-hooks to finish
 env_before="$(env | sort)"
 echo "Evaluating ${#envscript} bytes of env"
 set -o allexport
