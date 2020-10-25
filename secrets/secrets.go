@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"strings"
+
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/sentinel"
 )
 
 // Client represents interaction with AWS S3
@@ -16,8 +18,10 @@ type Client interface {
 
 // Agent represents interaction with an ssh-agent process
 type Agent interface {
+	Run() (bool, error)
 	Add(key []byte) error
-	Pid() uint
+	Pid() int
+	Stdout() io.Reader
 }
 
 // Config holds all the parameters for Run()
@@ -132,9 +136,15 @@ func handleSSHKeys(conf Config, results <-chan getResult) error {
 	keyFound := false
 	for r := range results {
 		if r.err != nil {
-			// TODO: silently ignore NotFound & Forbidden errors
-			log.Printf("+++ :warning: Failed to download ssh-key %s/%s: %v", r.bucket, r.key, r.err)
+			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
+				log.Printf("+++ :warning: Failed to download ssh-key %s/%s: %v", r.bucket, r.key, r.err)
+			}
 			continue
+		}
+		if started, err := conf.SSHAgent.Run(); err != nil {
+			return err
+		} else if started {
+			log.Printf("Started ephemeral ssh-agent (pid %d)", conf.SSHAgent.Pid())
 		}
 		log.Printf(
 			"Loading %s/%s (%d bytes) into ssh-agent (pid %d)",
@@ -153,6 +163,9 @@ func handleSSHKeys(conf Config, results <-chan getResult) error {
 		)
 		log.Printf("See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information.")
 	}
+	if _, err := io.Copy(conf.EnvSink, conf.SSHAgent.Stdout()); err != nil {
+		return fmt.Errorf("copying ssh-agent env: %w", err)
+	}
 	return nil
 }
 
@@ -160,8 +173,9 @@ func handleEnvs(conf Config, results <-chan getResult) error {
 	log := conf.Logger
 	for r := range results {
 		if r.err != nil {
-			// TODO: silently ignore NotFound & Forbidden errors
-			log.Printf("+++ :warning: Failed to download env from %s/%s: %v", r.bucket, r.key, r.err)
+			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
+				log.Printf("+++ :warning: Failed to download env from %s/%s: %v", r.bucket, r.key, r.err)
+			}
 			continue
 		}
 		data := r.data
@@ -182,6 +196,9 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 	var helpers []string
 	for r := range results {
 		if r.err != nil {
+			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
+				log.Printf("+++ :warning: Failed to check %s/%s: %v", r.bucket, r.key, r.err)
+			}
 			continue
 		}
 		log.Printf("Adding git-credentials in %s/%s as a credential helper", r.bucket, r.key)

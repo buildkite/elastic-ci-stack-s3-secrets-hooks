@@ -1,20 +1,14 @@
 package s3
 
 import (
-	"errors"
 	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/sentinel"
 )
-
-// ErrNotFound is returned when an object is not found.
-var ErrNotFound = errors.New("Forbidden")
-
-// ErrForbidden is returned when access to an object is forbidden.
-var ErrForbidden = errors.New("NotFound")
 
 type Client struct {
 	s3 *s3.S3
@@ -34,7 +28,7 @@ func New(region string) (*Client, error) {
 
 // Get downloads an object from S3.
 // Intended for small files; object is fully read into memory.
-// Local errors ErrNotFound and ErrForbidden are returned for those cases.
+// sentinel.ErrNotFound and sentinel.ErrForbidden are returned for those cases.
 // Other errors are returned verbatim.
 func (c *Client) Get(bucket, key string) ([]byte, error) {
 	out, err := c.s3.GetObject(&s3.GetObjectInput{
@@ -45,9 +39,9 @@ func (c *Client) Get(bucket, key string) ([]byte, error) {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case "NoSuchKey":
-				return nil, ErrNotFound
+				return nil, sentinel.ErrNotFound
 			case "Forbidden":
-				return nil, ErrForbidden
+				return nil, sentinel.ErrForbidden
 			default:
 				return nil, aerr
 			}

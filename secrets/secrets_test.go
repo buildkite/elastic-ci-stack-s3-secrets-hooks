@@ -3,6 +3,7 @@ package secrets_test
 import (
 	"bytes"
 	"errors"
+	"io"
 	"log"
 	"math/rand"
 	"reflect"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/secrets"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/sentinel"
 )
 
 type FakeClient struct {
@@ -31,7 +33,7 @@ func (c *FakeClient) Get(bucket, key string) ([]byte, error) {
 		return result.data, result.err
 	}
 	c.t.Logf("FakeClient Get %s: Not Found", path)
-	return nil, errors.New("Not Found") // TODO: error type
+	return nil, sentinel.ErrNotFound
 }
 
 func (c *FakeClient) BucketExists(bucket string) (bool, error) {
@@ -41,28 +43,50 @@ func (c *FakeClient) BucketExists(bucket string) (bool, error) {
 type FakeAgent struct {
 	t    *testing.T
 	keys []string
+	run  bool
+}
+
+func (a *FakeAgent) Run() (bool, error) {
+	if a.run {
+		return false, nil
+	}
+	a.run = true
+	return true, nil
 }
 
 func (a *FakeAgent) Add(key []byte) error {
+	if !a.run {
+		return errors.New("Agent must Run() before Add()")
+	}
 	a.t.Logf("FakeAgent Add (%d bytes)", len(key))
 	a.keys = append(a.keys, string(key))
 	return nil
 }
 
-func (a *FakeAgent) Pid() uint {
+func (a *FakeAgent) Pid() int {
 	return 42
+}
+
+func (a *FakeAgent) Stdout() io.Reader {
+	if len(a.keys) == 0 {
+		return strings.NewReader("")
+	}
+	return strings.NewReader(`SSH_AUTH_SOCK=/path/to/socket; export SSH_AUTH_SOCK;
+SSH_AGENT_PID=42; export SSH_AGENT_PID;
+echo Agent pid 42
+`)
 }
 
 func TestRun(t *testing.T) {
 	fakeData := map[string]FakeObject{
-		"bkt/pipeline/private_ssh_key": {nil, errors.New("NotFound")}, // TODO: error type
+		"bkt/pipeline/private_ssh_key": {nil, sentinel.ErrNotFound},
 		"bkt/pipeline/id_rsa_github":   {[]byte("pipeline key"), nil},
 		"bkt/private_ssh_key":          {[]byte("general key"), nil},
-		"bkt/id_rsa_github":            {nil, errors.New("Forbidden")}, // TODO: error type
+		"bkt/id_rsa_github":            {nil, sentinel.ErrForbidden},
 
 		"bkt/env":                  {[]byte("A=one\nB=two"), nil},
-		"bkt/environment":          {nil, errors.New("Forbidden")}, // TODO: error type
-		"bkt/pipeline/env":         {nil, errors.New("NotFound")},  // TODO: error type
+		"bkt/environment":          {nil, sentinel.ErrForbidden},
+		"bkt/pipeline/env":         {nil, sentinel.ErrNotFound},
 		"bkt/pipeline/environment": {[]byte("C=three"), nil},
 
 		"bkt/git-credentials":          {[]byte("general git key"), nil},
@@ -95,9 +119,15 @@ func TestRun(t *testing.T) {
 		"'credential.helper=/path/to/git-credential-s3-secrets bkt pipeline/git-credentials'",
 	}, " ") + "\n"
 	expected := strings.Join([]string{
+		// because an SSH key was found, ssh-agent was started:
+		"SSH_AUTH_SOCK=/path/to/socket; export SSH_AUTH_SOCK;",
+		"SSH_AGENT_PID=42; export SSH_AGENT_PID;",
+		"echo Agent pid 42",
+		// combined env files:
 		"A=one",
 		"B=two",
 		"C=three",
+		// because git-credentials were found:
 		"GIT_CONFIG_PARAMETERS=" + gitCredentialHelpers,
 	}, "\n")
 	if actual := envSink.String(); expected != actual {
