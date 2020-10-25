@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	envBucket        = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
-	envPrefix        = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
-	envPipeline      = "BUILDKITE_PIPELINE_SLUG"
-	envRepo          = "BUILDKITE_REPO"
-	envEnvSink       = "BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK"
-	envDefaultRegion = "AWS_DEFAULT_REGION"
+	envBucket     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
+	envPrefix     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
+	envPipeline   = "BUILDKITE_PIPELINE_SLUG"
+	envRepo       = "BUILDKITE_REPO"
+	envEnvSink    = "BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK"
+	envCredHelper = "GIT_CREDENTIAL_S3_SECRETS"
 
-	gitCredentialsHelper = "git-credential-s3-secrets"
-	defaultRegion        = "us-east-1"
+	envDefaultRegion = "AWS_DEFAULT_REGION"
+	defaultRegion    = "us-east-1"
 )
 
 func main() {
@@ -63,11 +63,10 @@ func mainWithError(log *log.Logger) error {
 		return err
 	}
 
-	//helper, err := exec.LookPath(gitCredentialsHelper)
-	//if err != nil {
-	//	return fmt.Errorf("error finding %s: %w", gitCredentialsHelper, err)
-	//}
-	helper := gitCredentialsHelper // TODO: find
+	credHelper := os.Getenv(envCredHelper)
+	if credHelper == "" {
+		return fmt.Errorf("%s required", envCredHelper)
+	}
 
 	return secrets.Run(secrets.Config{
 		Repo:                os.Getenv(envRepo),
@@ -77,6 +76,6 @@ func mainWithError(log *log.Logger) error {
 		Logger:              log,
 		SSHAgent:            agent,
 		EnvSink:             envSink,
-		GitCredentialHelper: helper,
+		GitCredentialHelper: credHelper,
 	})
 }

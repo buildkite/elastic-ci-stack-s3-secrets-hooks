@@ -183,7 +183,6 @@ func handleEnvs(conf Config, results <-chan getResult) error {
 			data = append(data, '\n')
 		}
 		log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
-		// TODO: mutex on EnvSink
 		if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
 			return fmt.Errorf("copying env: %w", err)
 		}
@@ -211,7 +210,6 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 		return nil
 	}
 	env := "GIT_CONFIG_PARAMETERS=" + strings.Join(helpers, " ") + "\n"
-	// TODO: mutex on EnvSink
 	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
 		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
 	}
