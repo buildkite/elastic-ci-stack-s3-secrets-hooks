@@ -16,7 +16,7 @@ const (
 	envPipeline   = "BUILDKITE_PIPELINE_SLUG"
 	envRepo       = "BUILDKITE_REPO"
 	envEnvSink    = "BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK"
-	envCredHelper = "GIT_CREDENTIAL_S3_SECRETS"
+	envCredHelper = "BUILDKITE_PLUGIN_S3_SECRETS_GIT_CREDENTIAL_HELPER"
 
 	envDefaultRegion = "AWS_DEFAULT_REGION"
 	defaultRegion    = "us-east-1"
