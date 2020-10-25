@@ -11,13 +11,15 @@ import (
 )
 
 const (
-	envBucket   = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
-	envPrefix   = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
-	envPipeline = "BUILDKITE_PIPELINE_SLUG"
-	envRepo     = "BUILDKITE_REPO"
-	envEnvSink  = "BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK"
+	envBucket        = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
+	envPrefix        = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
+	envPipeline      = "BUILDKITE_PIPELINE_SLUG"
+	envRepo          = "BUILDKITE_REPO"
+	envEnvSink       = "BUILDKITE_PLUGIN_S3_SECRETS_ENV_SINK"
+	envDefaultRegion = "AWS_DEFAULT_REGION"
 
 	gitCredentialsHelper = "git-credential-s3-secrets"
+	defaultRegion        = "us-east-1"
 )
 
 func main() {
@@ -41,7 +43,14 @@ func mainWithError(log *log.Logger) error {
 		return fmt.Errorf("%s or %s required", envPrefix, envPipeline)
 	}
 
-	client := s3.New()
+	region := os.Getenv(envDefaultRegion)
+	if region == "" {
+		region = defaultRegion
+	}
+	client, err := s3.New(region)
+	if err != nil {
+		return err
+	}
 
 	agent := &sshagent.Agent{}
 
