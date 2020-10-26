@@ -22,7 +22,7 @@ const (
 )
 
 func main() {
-	log := log.New(os.Stderr, "[secrets] ", log.Lmsgprefix)
+	log := log.New(os.Stderr, "", log.Lmsgprefix)
 	if err := mainWithError(log); err != nil {
 		log.Fatalf("fatal error: %v", err)
 	}
