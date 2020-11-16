@@ -12,7 +12,7 @@ load '/usr/local/lib/bats/load.bash'
   export BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV=true
   export BUILDKITE_PIPELINE_SLUG=test
 
-  stub elastic-ci-stack-s3-secrets-hooks \
+  stub s3secrets-helper \
     ": echo -e \"A=hello\nB=world\necho Agent pid 42\n\""
 
   run bash -c "$PWD/hooks/environment && $PWD/hooks/pre-exit"
@@ -23,5 +23,5 @@ load '/usr/local/lib/bats/load.bash'
   assert_output --partial "A=hello"
   assert_output --partial "B=world"
 
-  unstub elastic-ci-stack-s3-secrets-hooks
+  unstub s3secrets-helper
 }

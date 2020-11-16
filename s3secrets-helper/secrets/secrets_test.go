@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/secrets"
-	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/sentinel"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/secrets"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
 )
 
 type FakeClient struct {

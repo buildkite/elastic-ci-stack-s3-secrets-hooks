@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3"
-	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/secrets"
-	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/sshagent"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/s3"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/secrets"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sshagent"
 )
 
 const (

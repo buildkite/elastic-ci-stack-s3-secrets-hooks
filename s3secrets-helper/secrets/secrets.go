@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/sentinel"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
 )
 
 // Client represents interaction with AWS S3
