@@ -115,9 +115,9 @@ func TestRun(t *testing.T) {
 
 	// verify env
 	gitCredentialHelpers := strings.Join([]string{
-		"'credential.helper=/path/to/git-credential-s3-secrets bkt git-credentials'",
-		"'credential.helper=/path/to/git-credential-s3-secrets bkt pipeline/git-credentials'",
-	}, " ") + "\n"
+		`'credential.helper=/path/to/git-credential-s3-secrets bkt git-credentials'`,
+		`'credential.helper=/path/to/git-credential-s3-secrets bkt pipeline/git-credentials'`,
+	}, " ")
 	expected := strings.Join([]string{
 		// because an SSH key was found, ssh-agent was started:
 		"SSH_AUTH_SOCK=/path/to/socket; export SSH_AUTH_SOCK;",
@@ -128,8 +128,9 @@ func TestRun(t *testing.T) {
 		"B=two",
 		"C=three",
 		// because git-credentials were found:
-		"GIT_CONFIG_PARAMETERS=" + gitCredentialHelpers,
-	}, "\n")
+		// (wrap in double quotes so that bash eval doesn't consume the inner single quote.
+		`GIT_CONFIG_PARAMETERS="` + gitCredentialHelpers + `"`,
+	}, "\n") + "\n"
 	if actual := envSink.String(); expected != actual {
 		t.Errorf("unexpected env written:\n-%q\n+%q", expected, actual)
 	}

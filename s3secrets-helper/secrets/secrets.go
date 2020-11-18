@@ -209,7 +209,7 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 	if len(helpers) == 0 {
 		return nil
 	}
-	env := "GIT_CONFIG_PARAMETERS=" + strings.Join(helpers, " ") + "\n"
+	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(helpers, " ") + "\"\n"
 	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
 		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
 	}
