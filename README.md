@@ -12,9 +12,12 @@ Different types of secrets are supported and exposed to your builds in appropria
 
 The hooks needs to be installed directly in the agent so that secrets can be downloaded before jobs attempt checking out your repository. We are going to assume that buildkite has been installed at `/buildkite`, but this will vary depending on your operating system. Change the instructions accordingly.
 
+The core of the hook is an `s3secrets-helper` binary, the result of `go build` in the `s3secrets-helper/` subdirectory of this repository. It must be placed in `$PATH` to be found by the `hooks/environment` wrapper script.
+
 ```bash
 # clone to a path your buildkite-agent can access
 git clone https://github.com/buildkite-plugins/s3-secrets-buildkite-plugin.git /buildkite/s3_secrets
+(cd /buildkite/s3_secrets/s3secrets-helper && go build -o /usr/local/bin/s3secrets-helper)
 ```
 
 Modify your agent's global hooks (see [https://buildkite.com/docs/agent/v3/hooks#global-hooks](https://buildkite.com/docs/agent/v3/hooks#global-hooks)):
@@ -50,7 +53,9 @@ When run via the agent environment and pre-exit hook, your builds will check in 
 - `s3://{bucket_name}/environment` or `s3://{bucket_name}/env`
 - `s3://{bucket_name}/git-credentials`
 
-The private key is exposed to both the checkout and the command as an ssh-agent instance. The secrets in the env file are exposed as environment variables.
+The private key is exposed to both the checkout and the command as an ssh-agent instance.
+The secrets in the env file are exposed as environment variables.
+The locations of git-credentials are passed via `GIT_CONFIG_PARAMETERS` environment to git.
 
 ## Uploading Secrets
 
