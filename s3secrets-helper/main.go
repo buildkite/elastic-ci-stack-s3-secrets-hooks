@@ -39,7 +39,7 @@ func mainWithError(log *log.Logger) error {
 		return fmt.Errorf("%s or %s required", envPrefix, envPipeline)
 	}
 
-	client, err := s3.New(bucket)
+	client, err := s3.New(log, bucket)
 	if err != nil {
 		return err
 	}
