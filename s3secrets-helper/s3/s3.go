@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -37,11 +38,15 @@ func New(bucket string) (*Client, error) {
 		currentRegion = "us-east-1"
 	}
 
+	fmt.Printf("Discovered current region as %q\n", currentRegion)
+
 	// Using the current region (or a guess) find where the bucket lives
 	bucketRegion, err := s3manager.GetBucketRegion(aws.BackgroundContext(), sess, bucket, currentRegion)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Discovered bucket region as %q\n", bucketRegion)
 
 	sess, err = session.NewSession(&aws.Config{
 		Region: &bucketRegion,
