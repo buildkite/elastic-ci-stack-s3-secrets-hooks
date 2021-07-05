@@ -16,9 +16,6 @@ const (
 	envPipeline   = "BUILDKITE_PIPELINE_SLUG"
 	envRepo       = "BUILDKITE_REPO"
 	envCredHelper = "BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER"
-
-	envDefaultRegion = "AWS_DEFAULT_REGION"
-	defaultRegion    = "us-east-1"
 )
 
 func main() {
@@ -42,11 +39,7 @@ func mainWithError(log *log.Logger) error {
 		return fmt.Errorf("%s or %s required", envPrefix, envPipeline)
 	}
 
-	region := os.Getenv(envDefaultRegion)
-	if region == "" {
-		region = defaultRegion
-	}
-	client, err := s3.New(region)
+	client, err := s3.New(bucket)
 	if err != nil {
 		return err
 	}

@@ -12,8 +12,9 @@ import (
 
 // Client represents interaction with AWS S3
 type Client interface {
-	Get(bucket, key string) ([]byte, error)
-	BucketExists(bucket string) (bool, error)
+	Bucket() (string)
+	Get(key string) ([]byte, error)
+	BucketExists() (bool, error)
 }
 
 // Agent represents interaction with an ssh-agent process
@@ -56,12 +57,12 @@ type Config struct {
 // functionality; secrets are downloaded from S3, and loaded into ssh-agent
 // etc.
 func Run(conf Config) error {
-	bucket := conf.Bucket
+	bucket := conf.Client.Bucket()
 	log := conf.Logger
 
 	log.Printf("~~~ Downloading secrets from :s3: %s", bucket)
 
-	if ok, err := conf.Client.BucketExists(bucket); !ok {
+	if ok, err := conf.Client.BucketExists(); !ok {
 		if err != nil {
 			log.Printf("+++ :warning: Bucket %q not found: %v", bucket, err)
 		} else {
@@ -102,7 +103,7 @@ func getSSHKeys(conf Config, results chan<- getResult) {
 	for _, k := range keys {
 		conf.Logger.Printf("- %s", k)
 	}
-	go GetAll(conf.Client, conf.Bucket, keys, results)
+	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
 }
 
 func getEnvs(conf Config, results chan<- getResult) {
@@ -116,7 +117,7 @@ func getEnvs(conf Config, results chan<- getResult) {
 	for _, k := range keys {
 		conf.Logger.Printf("- %s", k)
 	}
-	go GetAll(conf.Client, conf.Bucket, keys, results)
+	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
 }
 
 func getGitCredentials(conf Config, results chan<- getResult) {
@@ -128,7 +129,7 @@ func getGitCredentials(conf Config, results chan<- getResult) {
 	for _, k := range keys {
 		conf.Logger.Printf("- %s", k)
 	}
-	go GetAll(conf.Client, conf.Bucket, keys, results)
+	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
 }
 
 func handleSSHKeys(conf Config, results <-chan getResult) error {
@@ -241,7 +242,7 @@ func GetAll(c Client, bucket string, keys []string, results chan<- getResult) {
 		// goroutine immediately fetches from S3, then waits for its turn to send
 		// to the results channel; concurrent fetch, ordered results.
 		go func(k string, link <-chan chan<- getResult, nextLink chan<- chan<- getResult) {
-			data, err := c.Get(bucket, k)
+			data, err := c.Get(k)
 			results := <-link // wait for results channel from previous goroutine
 			results <- getResult{bucket: bucket, key: k, data: data, err: err}
 			nextLink <- results // send results channel to the next goroutine
