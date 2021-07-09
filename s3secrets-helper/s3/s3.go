@@ -1,38 +1,76 @@
 package s3
 
 import (
+	"log"
 	"io/ioutil"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
 )
 
+const envDefaultRegion = "AWS_DEFAULT_REGION"
+
 type Client struct {
 	s3 *s3.S3
+	bucket string
 }
 
-func New(region string) (*Client, error) {
-	sess, err := session.NewSession(&aws.Config{
-		Region: &region,
+func New(log *log.Logger, bucket string) (*Client, error) {
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, err
+	}
+
+	currentRegion := os.Getenv(envDefaultRegion)
+	// Discover our executing region using the IMDS
+	if currentRegion == "" {
+		idms := ec2metadata.New(sess)
+		currentRegion, _ = idms.Region()
+	}
+	// Fall back to us-east-1 :(
+	if currentRegion == "" {
+		currentRegion = "us-east-1"
+	}
+
+	log.Printf("Discovered current region as %q\n", currentRegion)
+
+	// Using the current region (or a guess) find where the bucket lives
+	bucketRegion, err := s3manager.GetBucketRegion(aws.BackgroundContext(), sess, bucket, currentRegion)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Discovered bucket region as %q\n", bucketRegion)
+
+	sess, err = session.NewSession(&aws.Config{
+		Region: &bucketRegion,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &Client{
 		s3: s3.New(sess),
+		bucket: bucket,
 	}, nil
+}
+
+func (c *Client) Bucket() (string) {
+	return c.bucket
 }
 
 // Get downloads an object from S3.
 // Intended for small files; object is fully read into memory.
 // sentinel.ErrNotFound and sentinel.ErrForbidden are returned for those cases.
 // Other errors are returned verbatim.
-func (c *Client) Get(bucket, key string) ([]byte, error) {
+func (c *Client) Get(key string) ([]byte, error) {
 	out, err := c.s3.GetObject(&s3.GetObjectInput{
-		Bucket: &bucket,
+		Bucket: &c.bucket,
 		Key:    &key,
 	})
 	if err != nil {
@@ -59,8 +97,8 @@ func (c *Client) Get(bucket, key string) ([]byte, error) {
 // 200 OK returns true without error.
 // 404 Not Found and 403 Forbidden return false without error.
 // Other errors result in false with an error.
-func (c *Client) BucketExists(bucket string) (bool, error) {
-	if _, err := c.s3.HeadBucket(&s3.HeadBucketInput{Bucket: &bucket}); err != nil {
+func (c *Client) BucketExists() (bool, error) {
+	if _, err := c.s3.HeadBucket(&s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			// https://github.com/aws/aws-sdk-go/issues/2593#issuecomment-491436818
