@@ -6,8 +6,9 @@ pushd s3secrets-helper
 
 mkdir -p pkg
 
-go build -o pkg/s3secrets-helper
+binary="s3secrets-helper-${GOOS}-${GOARCH}"
+go build -o "pkg/${binary}"
 
 pushd pkg
 
-buildkite-agent artifact upload s3secrets-helper "pkg/${GOOS}-${GOARCH}/"
+buildkite-agent artifact upload "${binary}"
