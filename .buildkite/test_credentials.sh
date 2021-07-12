@@ -29,6 +29,9 @@ if [[ -d example-private-repository ]] ; then
   rm -rf example-private-repository
 fi
 
+# Cannot use git+ssh because the ephemeral ssh-agent will be started in the
+# Docker container / pid namespace above and be terminated after the process
+# s3secrets-helper process exits
 echo "+++ Cloning private repository with https"
-git clone -- https://github.com/lox/example-private-repository.git example-private-repository
+git clone -- https://github.com/buildkite/example-private-repository.git example-private-repository
 rm -rf example-private-repository
