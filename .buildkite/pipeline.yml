@@ -1,4 +1,24 @@
 steps:
+  - label: ":linux: x86_64"
+    command: /bin/true
+
+  - label: ":linux: arm64"
+    command: /bin/true
+
+  - label: ":windows: x86_64"
+    command: /bin/true
+
+  - label: ":windows: arm64"
+    command: /bin/true
+
+  - label: ":macOS: x86_64"
+    command: /bin/true
+
+  - label: ":macOS: arm64"
+    command: /bin/true
+
+  - wait
+
   - label: ":bash: :hammer:"
     plugins:
       docker-compose#v2.2.0:
