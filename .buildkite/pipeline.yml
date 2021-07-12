@@ -1,18 +1,18 @@
 steps:
   - label: ":linux: x86_64"
-    command: /bin/true
+    command: .buildkite/steps/build-binary.sh
     env:
       GOOS: linux
       GOARCH: amd64
 
   - label: ":linux: arm64"
-    command: /bin/true
+    command: .buildkite/steps/build-binary.sh
     env:
       GOOS: linux
       GOARCH: arm64
 
   - label: ":windows: x86_64"
-    command: /bin/true
+    command: .buildkite/steps/build-binary.sh
     env:
       GOOS: windows
       GOARCH: amd64
@@ -21,19 +21,19 @@ steps:
   # https://tip.golang.org/doc/go1.17
   # https://github.com/golang/go/issues/36439
   # - label: ":windows: arm64"
-  #   command: /bin/true
+  #   command: .buildkite/steps/build-binary.sh
   #   env:
   #     GOOS: windows
   #     GOARCH: arm64
 
   - label: ":macOS: x86_64"
-    command: /bin/true
+    command: .buildkite/steps/build-binary.sh
     env:
       GOOS: darwin
       GOARCH: amd64
 
   - label: ":macOS: arm64"
-    command: /bin/true
+    command: .buildkite/steps/build-binary.sh
     env:
       GOOS: darwin
       GOARCH: arm64
