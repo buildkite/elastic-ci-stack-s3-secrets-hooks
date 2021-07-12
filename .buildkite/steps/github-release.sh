@@ -16,7 +16,7 @@ echo '--- Downloading releases'
 
 rm -rf pkg
 mkdir -p pkg
-buildkite-agent artifact download "pkg/*"
+buildkite-agent artifact download "pkg/*" .
 
 echo '--- Creating GitHub Release'
 
