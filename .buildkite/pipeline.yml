@@ -1,4 +1,6 @@
 steps:
+  - wait
+
   - label: ":linux: x86_64"
     plugins:
       docker-compose#v3.7.0:
@@ -77,3 +79,28 @@ steps:
 
   - label: "㊙️ git-credentials test"
     command: .buildkite/test_credentials.sh
+
+  - wait
+
+  - block: ":git: tag?"
+    prompt: "Tag this commit and attach binaries to a GitHub release?"
+    fields:
+      - text: "Version"
+        hint: "The git tag to create e.g. v2.1.0"
+        key: "version"
+    branches:
+      - master
+
+  - name: ":octocat: :rocket:"
+    command: ".buildkite/steps/github-release.sh"
+    branches:
+      - master
+    agents:
+      queue: "deploy"
+    plugins:
+      - ecr#v2.0.0:
+          login: true
+          account-ids: "032379705303"
+      - docker#v3.5.0:
+          image: "032379705303.dkr.ecr.us-east-1.amazonaws.com/deploytools:2020.03"
+          propagate-environment: true
