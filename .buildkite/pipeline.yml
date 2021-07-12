@@ -1,5 +1,9 @@
 steps:
   - label: ":linux: x86_64"
+    plugins:
+      docker-compose#v3.0.0:
+        config: .buildkite/docker-compose.yml
+        run: agent
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: linux
@@ -8,6 +12,10 @@ steps:
       - "pkg/*"
 
   - label: ":linux: arm64"
+    plugins:
+      docker-compose#v3.0.0:
+        config: .buildkite/docker-compose.yml
+        run: agent
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: linux
@@ -16,6 +24,10 @@ steps:
       - "pkg/*"
 
   - label: ":windows: x86_64"
+    plugins:
+      docker-compose#v3.0.0:
+        config: .buildkite/docker-compose.yml
+        run: agent
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: windows
@@ -27,12 +39,20 @@ steps:
   # https://tip.golang.org/doc/go1.17
   # https://github.com/golang/go/issues/36439
   # - label: ":windows: arm64"
+  #   plugins:
+  #     docker-compose#v3.0.0:
+  #       config: .buildkite/docker-compose.yml
+  #       run: agent
   #   command: .buildkite/steps/build-binary.sh
   #   env:
   #     GOOS: windows
   #     GOARCH: arm64
 
   - label: ":macOS: x86_64"
+    plugins:
+      docker-compose#v3.0.0:
+        config: .buildkite/docker-compose.yml
+        run: agent
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: darwin
@@ -41,6 +61,10 @@ steps:
       - "pkg/*"
 
   - label: ":macOS: arm64"
+    plugins:
+      docker-compose#v3.0.0:
+        config: .buildkite/docker-compose.yml
+        run: agent
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: darwin

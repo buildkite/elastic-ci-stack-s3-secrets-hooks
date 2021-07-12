@@ -1,0 +1,15 @@
+version: '3.5'
+
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile-compile
+    volumes:
+      - ../:/work:cached
+    working_dir: /work
+    environment:
+      - BUILDKITE_BUILD_NUMBER
+      - BUILDKITE_JOB_ID
+      - GOOS
+      - GOARCH
