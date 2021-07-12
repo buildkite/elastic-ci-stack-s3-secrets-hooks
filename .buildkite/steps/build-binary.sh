@@ -8,7 +8,3 @@ mkdir -p pkg
 
 binary="s3secrets-helper-${GOOS}-${GOARCH}"
 go build -o "pkg/${binary}"
-
-pushd pkg
-
-buildkite-agent artifact upload "${binary}"

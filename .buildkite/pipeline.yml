@@ -4,18 +4,24 @@ steps:
     env:
       GOOS: linux
       GOARCH: amd64
+    artifact_paths:
+      - "pkg/*"
 
   - label: ":linux: arm64"
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: linux
       GOARCH: arm64
+    artifact_paths:
+      - "pkg/*"
 
   - label: ":windows: x86_64"
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: windows
       GOARCH: amd64
+    artifact_paths:
+      - "pkg/*"
 
   # Requires golang 1.17 with support for windows/arm64
   # https://tip.golang.org/doc/go1.17
@@ -31,12 +37,16 @@ steps:
     env:
       GOOS: darwin
       GOARCH: amd64
+    artifact_paths:
+      - "pkg/*"
 
   - label: ":macOS: arm64"
     command: .buildkite/steps/build-binary.sh
     env:
       GOOS: darwin
       GOARCH: arm64
+    artifact_paths:
+      - "pkg/*"
 
   - wait
 
