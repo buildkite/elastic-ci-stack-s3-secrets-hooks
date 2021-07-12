@@ -1,7 +1,7 @@
 steps:
   - label: ":linux: x86_64"
     plugins:
-      docker-compose#v3.0.0:
+      docker-compose#v3.7.0:
         config: .buildkite/docker-compose.yml
         run: agent
         mount-buildkite-agent: true
@@ -12,7 +12,7 @@ steps:
 
   - label: ":linux: arm64"
     plugins:
-      docker-compose#v3.0.0:
+      docker-compose#v3.7.0:
         config: .buildkite/docker-compose.yml
         run: agent
         mount-buildkite-agent: true
@@ -23,7 +23,7 @@ steps:
 
   - label: ":windows: x86_64"
     plugins:
-      docker-compose#v3.0.0:
+      docker-compose#v3.7.0:
         config: .buildkite/docker-compose.yml
         run: agent
         mount-buildkite-agent: true
@@ -37,7 +37,7 @@ steps:
   # https://github.com/golang/go/issues/36439
   # - label: ":windows: arm64"
   #   plugins:
-  #     docker-compose#v3.0.0:
+  #     docker-compose#v3.7.0:
   #       config: .buildkite/docker-compose.yml
   #       run: agent
   #       mount-buildkite-agent: true
@@ -48,7 +48,7 @@ steps:
 
   - label: ":mac: x86_64"
     plugins:
-      docker-compose#v3.0.0:
+      docker-compose#v3.7.0:
         config: .buildkite/docker-compose.yml
         run: agent
         mount-buildkite-agent: true
@@ -59,7 +59,7 @@ steps:
 
   - label: ":mac: arm64"
     plugins:
-      docker-compose#v3.0.0:
+      docker-compose#v3.7.0:
         config: .buildkite/docker-compose.yml
         run: agent
         mount-buildkite-agent: true
