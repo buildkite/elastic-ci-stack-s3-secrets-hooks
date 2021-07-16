@@ -180,12 +180,15 @@ func handleEnvs(conf Config, results <-chan getResult) error {
 			continue
 		}
 		data := r.data
-		if data[len(data)-1] != '\n' {
-			data = append(data, '\n')
-		}
-		log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
-		if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
-			return fmt.Errorf("copying env: %w", err)
+
+		if len(data) > 0 {
+			if data[len(data)-1] != '\n' {
+				data = append(data, '\n')
+			}
+			log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
+			if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
+				return fmt.Errorf("copying env: %w", err)
+			}
 		}
 	}
 	return nil
