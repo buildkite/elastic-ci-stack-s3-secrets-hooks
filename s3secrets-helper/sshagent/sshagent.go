@@ -77,6 +77,7 @@ func (a *Agent) Add(key []byte) error {
 		return errors.New("Agent must Run() before Add()")
 	}
 	cmd := exec.Command("ssh-add", "-")
+	key = append(key, '\n')
 	cmd.Stdin = bytes.NewReader(key)
 	cmd.Env = []string{
 		"SSH_AGENT_PID=" + strconv.Itoa(a.pid),
