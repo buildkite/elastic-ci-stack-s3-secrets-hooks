@@ -206,14 +206,21 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 		}
 		log.Printf("Adding git-credentials in %s/%s as a credential helper", r.bucket, r.key)
 		helpers = append(helpers, fmt.Sprintf(
-			"'credential.helper=%s %s %s'",
+			"credential.helper=%s %s %s",
 			conf.GitCredentialHelper, r.bucket, r.key,
 		))
 	}
 	if len(helpers) == 0 {
 		return nil
 	}
-	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(helpers, " ") + "\"\n"
+
+	var singleQuotedHelpers []string
+	for helper := range helpers {
+		singleQuotedHelpers = append(singleQuotedHelpers, "'" + helper + "'")
+	}
+
+	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(singleQuotedHelpers, " ") + "\"\n"
+
 	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
 		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
 	}
