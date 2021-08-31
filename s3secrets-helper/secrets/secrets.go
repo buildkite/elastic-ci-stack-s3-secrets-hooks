@@ -205,15 +205,31 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 			continue
 		}
 		log.Printf("Adding git-credentials in %s/%s as a credential helper", r.bucket, r.key)
-		helpers = append(helpers, fmt.Sprintf(
-			"'credential.helper=%s %s %s'",
-			conf.GitCredentialHelper, r.bucket, r.key,
-		))
+
+		// Replace spaces ' ' in the helper path with an escaped space '\ '
+		escapedCredentialHelper := strings.ReplaceAll(conf.GitCredentialHelper, " ", "\\ ")
+
+		helper := fmt.Sprintf("credential.helper=%s %s %s", escapedCredentialHelper, r.bucket, r.key)
+
+		helpers = append(helpers, helper)
 	}
 	if len(helpers) == 0 {
 		return nil
 	}
-	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(helpers, " ") + "\"\n"
+
+	// Build an environment variable for interpretation by a shell
+	var singleQuotedHelpers []string
+	for _, helper := range helpers {
+		// Escape any escape sequences, the shell will interpret the first level
+		// of escaping.
+
+		// Replace backslash '\' with double backslash '\\'
+		helper = strings.ReplaceAll(helper, "\\", "\\\\")
+
+		singleQuotedHelpers = append(singleQuotedHelpers, "'" + helper + "'")
+	}
+	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(singleQuotedHelpers, " ") + "\"\n"
+
 	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
 		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
 	}
