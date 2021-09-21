@@ -14,7 +14,7 @@ The hooks needs to be installed directly in the agent so that secrets can be dow
 
 The core of the hook is an `s3secrets-helper` binary. This can be built using
 `go build` in the [`s3secrets-helper/`](s3secrets-helper) directory in this
-repository, or downloaded from the assets attached to the [GitHub Release](https://github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/releases).
+repository, or downloaded from the assets attached to a [GitHub Release](https://github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/releases).
 It must be placed in `$PATH` to be found by the `hooks/environment` wrapper script.
 
 ```bash
