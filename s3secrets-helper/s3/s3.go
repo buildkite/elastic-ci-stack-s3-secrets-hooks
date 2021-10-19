@@ -1,61 +1,58 @@
 package s3
 
 import (
+	"context"
+	"errors"
 	"log"
 	"io/ioutil"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
 )
 
-const envDefaultRegion = "AWS_DEFAULT_REGION"
-
 type Client struct {
-	s3 *s3.S3
+	s3 *s3.Client
 	bucket string
 }
 
 func New(log *log.Logger, bucket string) (*Client, error) {
-	sess, err := session.NewSession()
+	ctx := context.Background()
+
+	// Using the current region (or a guess) find where the bucket lives
+	managerCfg, err := config.LoadDefaultConfig(ctx,
+		// TODO confirm this region algorithm is equivalent to before,
+		// these are not processed in order, and are disjoint configs, region
+		// vs default region. The default loader considers imds region
+		// automatically too.
+		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
+		config.WithDefaultRegion("us-east-1"),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	currentRegion := os.Getenv(envDefaultRegion)
-	// Discover our executing region using the IMDS
-	if currentRegion == "" {
-		idms := ec2metadata.New(sess)
-		currentRegion, _ = idms.Region()
-	}
-	// Fall back to us-east-1 :(
-	if currentRegion == "" {
-		currentRegion = "us-east-1"
-	}
+	log.Printf("Discovered current region as %q\n", managerCfg.Region)
 
-	log.Printf("Discovered current region as %q\n", currentRegion)
-
-	// Using the current region (or a guess) find where the bucket lives
-	bucketRegion, err := s3manager.GetBucketRegion(aws.BackgroundContext(), sess, bucket, currentRegion)
+	managerClient := s3.NewFromConfig(managerCfg)
+	bucketRegion, err := manager.GetBucketRegion(ctx, managerClient, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Printf("Discovered bucket region as %q\n", bucketRegion)
 
-	sess, err = session.NewSession(&aws.Config{
-		Region: &bucketRegion,
-	})
+	s3Cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(bucketRegion))
 	if err != nil {
 		return nil, err
 	}
+
 	return &Client{
-		s3: s3.New(sess),
+		s3: s3.NewFromConfig(s3Cfg),
 		bucket: bucket,
 	}, nil
 }
@@ -69,23 +66,26 @@ func (c *Client) Bucket() (string) {
 // sentinel.ErrNotFound and sentinel.ErrForbidden are returned for those cases.
 // Other errors are returned verbatim.
 func (c *Client) Get(key string) ([]byte, error) {
-	out, err := c.s3.GetObject(&s3.GetObjectInput{
+	out, err := c.s3.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: &c.bucket,
 		Key:    &key,
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "NoSuchKey":
-				return nil, sentinel.ErrNotFound
-			case "Forbidden":
-				return nil, sentinel.ErrForbidden
-			default:
-				return nil, aerr
-			}
-		} else {
-			return nil, err
+		var noSuchKey *types.NoSuchKey
+		if errors.As(err, &noSuchKey) {
+			return nil, sentinel.ErrNotFound
 		}
+
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			code := apiErr.ErrorCode()
+			// TODO confirm "Forbidden" is a member of the set of values this can return
+			if code == "Forbidden" {
+				return nil, sentinel.ErrForbidden
+			}
+		}
+
+		return nil, err
 	}
 	defer out.Body.Close()
 	// we probably should return io.Reader or io.ReadCloser rather than []byte,
@@ -98,18 +98,8 @@ func (c *Client) Get(key string) ([]byte, error) {
 // 404 Not Found and 403 Forbidden return false without error.
 // Other errors result in false with an error.
 func (c *Client) BucketExists() (bool, error) {
-	if _, err := c.s3.HeadBucket(&s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			// https://github.com/aws/aws-sdk-go/issues/2593#issuecomment-491436818
-			case "NoSuchBucket", "NotFound":
-				return false, nil
-			default: // e.g. NoCredentialProviders, Forbidden
-				return false, aerr
-			}
-		} else {
-			return false, err
-		}
+	if _, err := c.s3.HeadBucket(context.Background(), &s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
+		return false, err
 	}
 	return true, nil
 }
