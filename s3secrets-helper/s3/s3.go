@@ -25,10 +25,6 @@ func New(log *log.Logger, bucket string) (*Client, error) {
 
 	// Using the current region (or a guess) find where the bucket lives
 	managerCfg, err := config.LoadDefaultConfig(ctx,
-		// TODO confirm this region algorithm is equivalent to before,
-		// these are not processed in order, and are disjoint configs, region
-		// vs default region. The default loader considers imds region
-		// automatically too.
 		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
 		config.WithDefaultRegion("us-east-1"),
 	)
