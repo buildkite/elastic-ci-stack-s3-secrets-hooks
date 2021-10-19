@@ -6,8 +6,8 @@ import "errors"
 
 var (
 	// ErrNotFound indicates something was not found
-	ErrNotFound = errors.New("Forbidden")
+	ErrNotFound = errors.New("NotFound")
 
 	// ErrForbidden indicates something was forbidden
-	ErrForbidden = errors.New("NotFound")
+	ErrForbidden = errors.New("Forbidden")
 )
