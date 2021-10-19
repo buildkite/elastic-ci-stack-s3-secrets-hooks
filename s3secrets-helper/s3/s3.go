@@ -26,6 +26,7 @@ func New(log *log.Logger, bucket string) (*Client, error) {
 	// Using the current region (or a guess) find where the bucket lives
 	managerCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
+		config.WithEC2IMDSRegion(),
 		config.WithDefaultRegion("us-east-1"),
 	)
 	if err != nil {
