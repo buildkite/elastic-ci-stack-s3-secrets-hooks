@@ -24,7 +24,7 @@ func New(log *log.Logger, bucket string) (*Client, error) {
 	ctx := context.Background()
 
 	// Using the current region (or a guess) find where the bucket lives
-	managerCfg, err := config.LoadDefaultConfig(ctx,
+	config, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
 		config.WithEC2IMDSRegion(),
 		config.WithDefaultRegion("us-east-1"),
@@ -33,23 +33,19 @@ func New(log *log.Logger, bucket string) (*Client, error) {
 		return nil, err
 	}
 
-	log.Printf("Discovered current region as %q\n", managerCfg.Region)
+	log.Printf("Discovered current region as %q\n", config.Region)
 
-	managerClient := s3.NewFromConfig(managerCfg)
-	bucketRegion, err := manager.GetBucketRegion(ctx, managerClient, bucket)
+	bucketRegion, err := manager.GetBucketRegion(ctx, s3.NewFromConfig(config), bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Printf("Discovered bucket region as %q\n", bucketRegion)
 
-	s3Cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(bucketRegion))
-	if err != nil {
-		return nil, err
-	}
+	config.Region = bucketRegion
 
 	return &Client{
-		s3: s3.NewFromConfig(s3Cfg),
+		s3: s3.NewFromConfig(config),
 		bucket: bucket,
 	}, nil
 }
