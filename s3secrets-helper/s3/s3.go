@@ -24,8 +24,28 @@ func New(log *log.Logger, bucket string) (*Client, error) {
 	ctx := context.Background()
 
 	// Using the current region (or a guess) find where the bucket lives
+
+	/*
+		There are three region resolvers:
+		- resolveRegion
+		- resolveEC2IMDSRegion
+		- resolveDefaultRegion
+
+		There are also three config providers:
+		- LoadOptions (programatic provided below)
+		- EnvConfig (reads environment variables)
+		- SharedConfig (reads ~/.aws files)
+
+		The resolvers are run sequentially until a region is found, not all
+		config providers support each resolver. The absolute order is:
+
+		- resolveRegion LoadOptions => config.WithRegion() if given
+		- resolveRegion EnvConfig => first of AWS_REGION, AWS_DEFAULT_REGION
+		- resolveRegion SharedConfig => default profile on disk
+		- resolveEC2IMDSRegion LoadOptions => config.WithEC2IMDSRegion() if given
+		- resolveDefaultRegion LoadOptions => config.WithDefaultRegion() if given
+	*/
 	config, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
 		config.WithEC2IMDSRegion(),
 		config.WithDefaultRegion("us-east-1"),
 	)
