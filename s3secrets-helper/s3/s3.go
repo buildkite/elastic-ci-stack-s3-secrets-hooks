@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -20,34 +21,34 @@ type Client struct {
 	bucket string
 }
 
+func getRegion(ctx context.Context) (string, error) {
+	if region := os.Getenv("AWS_DEFAULT_REGION"); len(region) > 0 {
+		return region, nil
+	}
+
+	imdsClient := imds.New(imds.Options{})
+	if result, err := imdsClient.GetRegion(ctx, nil); err == nil {
+		if len(result.Region) > 0 {
+			return result.Region, nil
+		}
+	}
+
+	return "", errors.New("Unknown current region")
+}
+
 func New(log *log.Logger, bucket string) (*Client, error) {
 	ctx := context.Background()
 
 	// Using the current region (or a guess) find where the bucket lives
 
-	/*
-		There are three region resolvers:
-		- resolveRegion
-		- resolveEC2IMDSRegion
-		- resolveDefaultRegion
+	region, err := getRegion(ctx)
+	if err != nil {
+		// Ignore error and fallback to us-east-1 for bucket lookup
+		region = "us-east-1"
+	}
 
-		There are also three config providers:
-		- LoadOptions (programatic provided below)
-		- EnvConfig (reads environment variables)
-		- SharedConfig (reads ~/.aws files)
-
-		The resolvers are run sequentially until a region is found, not all
-		config providers support each resolver. The absolute order is:
-
-		- resolveRegion LoadOptions => config.WithRegion() if given
-		- resolveRegion EnvConfig => first of AWS_REGION, AWS_DEFAULT_REGION
-		- resolveRegion SharedConfig => default profile on disk
-		- resolveEC2IMDSRegion LoadOptions => config.WithEC2IMDSRegion() if given
-		- resolveDefaultRegion LoadOptions => config.WithDefaultRegion() if given
-	*/
 	config, err := config.LoadDefaultConfig(ctx,
-		config.WithEC2IMDSRegion(),
-		config.WithDefaultRegion("us-east-1"),
+		config.WithRegion(region),
 	)
 	if err != nil {
 		return nil, err
