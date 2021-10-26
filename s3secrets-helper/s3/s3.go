@@ -80,7 +80,7 @@ func (c *Client) Bucket() (string) {
 // sentinel.ErrNotFound and sentinel.ErrForbidden are returned for those cases.
 // Other errors are returned verbatim.
 func (c *Client) Get(key string) ([]byte, error) {
-	out, err := c.s3.GetObject(context.Background(), &s3.GetObjectInput{
+	out, err := c.s3.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &c.bucket,
 		Key:    &key,
 	})
@@ -112,7 +112,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 // 404 Not Found and 403 Forbidden return false without error.
 // Other errors result in false with an error.
 func (c *Client) BucketExists() (bool, error) {
-	if _, err := c.s3.HeadBucket(context.Background(), &s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
+	if _, err := c.s3.HeadBucket(context.TODO(), &s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
 		return false, err
 	}
 	return true, nil
