@@ -90,11 +90,11 @@ func (c *Client) Get(key string) ([]byte, error) {
 			return nil, sentinel.ErrNotFound
 		}
 
+		// Possible values can be found at https://docs.aws.amazon.com/AmazonS3/latest/API/API_Error.html
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
 			code := apiErr.ErrorCode()
-			// TODO confirm "Forbidden" is a member of the set of values this can return
-			if code == "Forbidden" {
+			if code == "AccessDenied" {
 				return nil, sentinel.ErrForbidden
 			}
 		}
