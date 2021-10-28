@@ -100,7 +100,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 			}
 		}
 
-		return nil, fmt.Errorf("Could not GetObject (%s) in bucket (%s): (%v)", key, c.bucket, err)
+		return nil, fmt.Errorf("Could not GetObject (%s) in bucket (%s). Ensure your IAM Identity has s3:GetObject permission for this key and bucket. (%v)", key, c.bucket, err)
 	}
 	defer out.Body.Close()
 	// we probably should return io.Reader or io.ReadCloser rather than []byte,
@@ -114,7 +114,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 // Other errors result in false with an error.
 func (c *Client) BucketExists() (bool, error) {
 	if _, err := c.s3.HeadBucket(context.TODO(), &s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
-		return false, fmt.Errorf("Could not HeadBucket (%s): (%v)", c.bucket, err)
+		return false, fmt.Errorf("Could not HeadBucket (%s). Ensure your IAM Identity has s3:ListBucket permission for this bucket. (%v)", c.bucket, err)
 	}
 	return true, nil
 }
