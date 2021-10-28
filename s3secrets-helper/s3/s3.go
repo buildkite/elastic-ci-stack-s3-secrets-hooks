@@ -3,6 +3,7 @@ package s3
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"io/ioutil"
 	"os"
@@ -51,14 +52,14 @@ func New(log *log.Logger, bucket string) (*Client, error) {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not load the AWS SDK config (%v)", err)
 	}
 
 	log.Printf("Discovered current region as %q\n", config.Region)
 
 	bucketRegion, err := manager.GetBucketRegion(ctx, s3.NewFromConfig(config), bucket)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not discover the region for bucket %q: (%v)", bucket, err)
 	}
 
 	log.Printf("Discovered bucket region as %q\n", bucketRegion)
@@ -99,7 +100,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 			}
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("Could not GetObject (%s) in bucket (%s): (%v)", key, c.bucket, err)
 	}
 	defer out.Body.Close()
 	// we probably should return io.Reader or io.ReadCloser rather than []byte,
@@ -113,7 +114,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 // Other errors result in false with an error.
 func (c *Client) BucketExists() (bool, error) {
 	if _, err := c.s3.HeadBucket(context.TODO(), &s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
-		return false, err
+		return false, fmt.Errorf("Could not HeadBucket (%s): (%v)", c.bucket, err)
 	}
 	return true, nil
 }
