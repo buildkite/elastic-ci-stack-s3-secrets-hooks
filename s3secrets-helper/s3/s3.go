@@ -22,6 +22,7 @@ import (
 type Client struct {
 	s3 *s3.Client
 	bucket string
+	region string
 }
 
 func getRegion(ctx context.Context) (string, error) {
@@ -83,11 +84,16 @@ func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
 	return &Client{
 		s3: s3.NewFromConfig(awsConfig),
 		bucket: bucket,
+		region: awsConfig.Region,
 	}, nil
 }
 
 func (c *Client) Bucket() (string) {
 	return c.bucket
+}
+
+func (c *Client) Region() (string) {
+	return c.region
 }
 
 // Get downloads an object from S3.

@@ -13,6 +13,7 @@ import (
 // Client represents interaction with AWS S3
 type Client interface {
 	Bucket() (string)
+	Region() (string)
 	Get(key string) ([]byte, error)
 	BucketExists() (bool, error)
 }
@@ -209,7 +210,7 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 		// Replace spaces ' ' in the helper path with an escaped space '\ '
 		escapedCredentialHelper := strings.ReplaceAll(conf.GitCredentialHelper, " ", "\\ ")
 
-		helper := fmt.Sprintf("credential.helper=%s %s %s", escapedCredentialHelper, r.bucket, r.key)
+		helper := fmt.Sprintf("credential.helper=%s %s %s %s", escapedCredentialHelper, r.bucket, conf.Client.Region(), r.key)
 
 		helpers = append(helpers, helper)
 	}
