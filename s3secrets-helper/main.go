@@ -5,17 +5,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/env"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/s3"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/secrets"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sshagent"
-)
-
-const (
-	envBucket     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
-	envPrefix     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
-	envPipeline   = "BUILDKITE_PIPELINE_SLUG"
-	envRepo       = "BUILDKITE_REPO"
-	envCredHelper = "BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER"
 )
 
 func main() {
@@ -26,33 +19,36 @@ func main() {
 }
 
 func mainWithError(log *log.Logger) error {
-	bucket := os.Getenv(envBucket)
+	bucket := os.Getenv(env.EnvBucket)
 	if bucket == "" {
 		return nil
 	}
 
-	prefix := os.Getenv(envPrefix)
+	// May be empty string
+	regionHint := os.Getenv(env.EnvRegion)
+
+	prefix := os.Getenv(env.EnvPrefix)
 	if prefix == "" {
-		prefix = os.Getenv(envPipeline)
+		prefix = os.Getenv(env.EnvPipeline)
 	}
 	if prefix == "" {
-		return fmt.Errorf("%s or %s required", envPrefix, envPipeline)
+		return fmt.Errorf("One of %s or %s environment variables required", env.EnvPrefix, env.EnvPipeline)
 	}
 
-	client, err := s3.New(log, bucket)
+	client, err := s3.New(log, bucket, regionHint)
 	if err != nil {
 		return err
 	}
 
 	agent := &sshagent.Agent{}
 
-	credHelper := os.Getenv(envCredHelper)
+	credHelper := os.Getenv(env.EnvCredHelper)
 	if credHelper == "" {
-		return fmt.Errorf("%s required", envCredHelper)
+		return fmt.Errorf("%s environment variable required", env.EnvCredHelper)
 	}
 
 	return secrets.Run(secrets.Config{
-		Repo:                os.Getenv(envRepo),
+		Repo:                os.Getenv(env.EnvRepo),
 		Bucket:              bucket,
 		Prefix:              prefix,
 		Client:              client,
