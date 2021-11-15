@@ -32,7 +32,7 @@ func mainWithError(log *log.Logger) error {
 		prefix = os.Getenv(env.EnvPipeline)
 	}
 	if prefix == "" {
-		return fmt.Errorf("One of the %s or %s environment variables is required, to determine what bucket prefix to scan for secrets.", env.EnvPrefix, env.EnvPipeline)
+		return fmt.Errorf("One of the %s or %s environment variables is required, set one to configure the bucket key prefix that is scanned for secrets.", env.EnvPrefix, env.EnvPipeline)
 	}
 
 	client, err := s3.New(log, bucket, regionHint)
@@ -44,7 +44,7 @@ func mainWithError(log *log.Logger) error {
 
 	credHelper := os.Getenv(env.EnvCredHelper)
 	if credHelper == "" {
-		return fmt.Errorf("The %s environment variable is required, set to the path of the git-credential-s3-secrets script.", env.EnvCredHelper)
+		return fmt.Errorf("The %s environment variable is required, set it to the path of the git-credential-s3-secrets script.", env.EnvCredHelper)
 	}
 
 	return secrets.Run(secrets.Config{
