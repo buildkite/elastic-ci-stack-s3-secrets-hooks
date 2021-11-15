@@ -25,7 +25,7 @@ type Client struct {
 	region string
 }
 
-func getRegion(ctx context.Context) (string, error) {
+func getCurrentRegion(ctx context.Context) (string, error) {
 	if region := os.Getenv("AWS_DEFAULT_REGION"); len(region) > 0 {
 		return region, nil
 	}
@@ -57,7 +57,7 @@ func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
 	} else {
 		// Otherwise, use the current region (or a guess) to dynamically find
 		// where the bucket lives.
-		region, err := getRegion(ctx)
+		region, err := getCurrentRegion(ctx)
 		if err != nil {
 			// Ignore error and fallback to us-east-1 for bucket lookup
 			region = "us-east-1"
@@ -77,7 +77,7 @@ func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
 			log.Printf("Discovered bucket region as %q\n", bucketRegion)
 			awsConfig.Region = bucketRegion
 		} else {
-			log.Printf("Could not discover bucket region for %q. Using the %q region as a fallback, configure a bucket region using the %q environment variable. (%v)\n", bucket, awsConfig.Region, env.EnvRegion, err)
+			log.Printf("Could not discover region for bucket %q. Using the %q region as a fallback, if this is not correct configure a bucket region using the %q environment variable. (%v)\n", bucket, awsConfig.Region, env.EnvRegion, err)
 		}
 	}
 
