@@ -8,21 +8,24 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/env"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
 )
 
 type Client struct {
 	s3 *s3.Client
 	bucket string
+	region string
 }
 
-func getRegion(ctx context.Context) (string, error) {
+func getCurrentRegion(ctx context.Context) (string, error) {
 	if region := os.Getenv("AWS_DEFAULT_REGION"); len(region) > 0 {
 		return region, nil
 	}
@@ -37,43 +40,60 @@ func getRegion(ctx context.Context) (string, error) {
 	return "", errors.New("Unknown current region")
 }
 
-func New(log *log.Logger, bucket string) (*Client, error) {
+func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
 	ctx := context.Background()
 
-	// Using the current region (or a guess) find where the bucket lives
+	var awsConfig aws.Config
+	var err error
 
-	region, err := getRegion(ctx)
-	if err != nil {
-		// Ignore error and fallback to us-east-1 for bucket lookup
-		region = "us-east-1"
+	if regionHint != "" {
+		// If there is a region hint provided, we use it unconditionally
+		awsConfig, err = config.LoadDefaultConfig(ctx,
+			config.WithRegion(regionHint),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("Could not load the AWS SDK config (%v)", err)
+		}
+	} else {
+		// Otherwise, use the current region (or a guess) to dynamically find
+		// where the bucket lives.
+		region, err := getCurrentRegion(ctx)
+		if err != nil {
+			// Ignore error and fallback to us-east-1 for bucket lookup
+			region = "us-east-1"
+		}
+
+		awsConfig, err = config.LoadDefaultConfig(ctx,
+			config.WithRegion(region),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("Could not load the AWS SDK config (%v)", err)
+		}
+
+		log.Printf("Discovered current region as %q\n", awsConfig.Region)
+
+		bucketRegion, err := manager.GetBucketRegion(ctx, s3.NewFromConfig(awsConfig), bucket)
+		if err == nil && bucketRegion != "" {
+			log.Printf("Discovered bucket region as %q\n", bucketRegion)
+			awsConfig.Region = bucketRegion
+		} else {
+			log.Printf("Could not discover region for bucket %q. Using the %q region as a fallback, if this is not correct configure a bucket region using the %q environment variable. (%v)\n", bucket, awsConfig.Region, env.EnvRegion, err)
+		}
 	}
-
-	config, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(region),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("Could not load the AWS SDK config (%v)", err)
-	}
-
-	log.Printf("Discovered current region as %q\n", config.Region)
-
-	bucketRegion, err := manager.GetBucketRegion(ctx, s3.NewFromConfig(config), bucket)
-	if err != nil {
-		return nil, fmt.Errorf("Could not discover the region for bucket %q: (%v)", bucket, err)
-	}
-
-	log.Printf("Discovered bucket region as %q\n", bucketRegion)
-
-	config.Region = bucketRegion
 
 	return &Client{
-		s3: s3.NewFromConfig(config),
+		s3: s3.NewFromConfig(awsConfig),
 		bucket: bucket,
+		region: awsConfig.Region,
 	}, nil
 }
 
 func (c *Client) Bucket() (string) {
 	return c.bucket
+}
+
+func (c *Client) Region() (string) {
+	return c.region
 }
 
 // Get downloads an object from S3.
