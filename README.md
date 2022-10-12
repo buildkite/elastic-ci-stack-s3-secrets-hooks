@@ -23,7 +23,7 @@ git clone https://github.com/buildkite-plugins/s3-secrets-buildkite-plugin.git /
 (cd /buildkite/s3_secrets/s3secrets-helper && go build -o /usr/local/bin/s3secrets-helper)
 ```
 
-Modify your agent's hooks (see [Hook Locations](https://buildkite.com/docs/agent/v3/hooks#hook-locations):
+Modify your agent's hooks (see [Hook Locations](https://buildkite.com/docs/agent/v3/hooks#hook-locations)):
 
 ### `${BUILDKITE_ROOT}/hooks/environment`
 
