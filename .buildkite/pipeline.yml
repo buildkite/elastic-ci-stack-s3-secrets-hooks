@@ -79,6 +79,9 @@ steps:
 
   - label: "㊙️ git-credentials test"
     command: .buildkite/test_credentials.sh
+    plugins:
+      - aws-assume-role-with-web-identity#v1.1.0:
+          role-arn: arn:aws:iam::172840064832:role/pipeline-buildkite-aws-stack-elastic-ci-stack-s3-secrets-hooks
 
   - wait
 
