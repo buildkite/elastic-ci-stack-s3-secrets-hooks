@@ -92,12 +92,12 @@ steps:
         hint: "The git tag to create e.g. v2.1.0"
         key: "version"
     branches:
-      - master
+      - main
 
   - name: ":octocat: :rocket:"
     command: ".buildkite/steps/github-release.sh"
     branches:
-      - master
+      - main
     agents:
       queue: "on-demand"
       task-definition: github-publish-buildkite-elastic-stack-releaser
