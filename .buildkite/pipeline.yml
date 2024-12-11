@@ -100,7 +100,7 @@ steps:
       - main
     plugins:
       - aws-assume-role-with-web-identity#v1.1.0:
-          role-arn: arn:aws:iam::172840064832:role/pipeline-buildkite-aws-stack-elastic-ci-stack-s3-secrets-hooks-main
+          role-arn: arn:aws:iam::172840064832:role/pipeline-elastic-ci-stack-s3-secrets-hooks-main
       - aws-ssm#v1.0.0:
           parameters:
             GITHUB_RELEASE_ACCESS_TOKEN: /pipelines/buildkite-aws-stack/elastic-ci-stack-s3-secrets-hooks/GITHUB_RELEASE_ACCESS_TOKEN
