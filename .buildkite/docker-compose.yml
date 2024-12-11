@@ -17,3 +17,4 @@ services:
       context: .
     volumes:
       - ../:/work:cached
+    working_dir: /work
