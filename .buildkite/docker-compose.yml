@@ -11,3 +11,9 @@ services:
     environment:
       - GOOS
       - GOARCH
+  release:
+    build:
+      dockerfile: Dockerfile-release
+      context: .
+    volumes:
+      - ../:/work:cached
