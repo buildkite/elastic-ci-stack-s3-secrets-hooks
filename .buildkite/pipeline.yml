@@ -98,6 +98,16 @@ steps:
     command: ".buildkite/steps/github-release.sh"
     branches:
       - main
-    agents:
-      queue: "on-demand"
-      task-definition: github-publish-buildkite-elastic-stack-releaser
+    plugins:
+      - aws-assume-role-with-web-identity#v1.1.0:
+          role-arn: arn:aws:iam::172840064832:role/pipeline-buildkite-aws-stack-elastic-ci-stack-s3-secrets-hooks-main
+      - aws-ssm#v1.0.0:
+          parameters:
+            GITHUB_RELEASE_ACCESS_TOKEN: /pipelines/buildkite-aws-stack/elastic-ci-stack-s3-secrets-hooks/GITHUB_RELEASE_ACCESS_TOKEN
+      - docker-compose#v3.7.0:
+          config: .buildkite/docker-compose.yml
+          run: release
+          mount-buildkite-agent: true
+          env:
+            - GITHUB_RELEASE_ACCESS_TOKEN
+

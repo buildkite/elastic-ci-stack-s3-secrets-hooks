@@ -1,0 +1,5 @@
+FROM debian:bookworm-slim
+
+ADD https://github.com/buildkite/github-release/releases/download/v1.0/github-release-linux-amd64 /usr/local/bin/github-release
+RUN chmod +x /usr/local/bin/github-release
+RUN apt update && apt install -y ca-certificates
