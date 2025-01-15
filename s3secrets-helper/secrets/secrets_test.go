@@ -89,8 +89,20 @@ func TestRun(t *testing.T) {
 		"bkt/pipeline/env":         {nil, sentinel.ErrNotFound},
 		"bkt/pipeline/environment": {[]byte("C=three"), nil},
 
+		"bkt/pipeline/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
+		"bkt/pipeline/DATABASE_SECRET":         {[]byte("database secret"), nil},
+		"bkt/pipeline/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
+		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
+		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
+
 		"bkt/git-credentials":          {[]byte("general git key"), nil},
 		"bkt/pipeline/git-credentials": {[]byte("pipeline git key"), nil},
+
+		"bkt/pipeline/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
+		"bkt/pipeline/DATABASE_SECRET":         {[]byte("database secret"), nil},
+		"bkt/pipeline/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
+		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
+		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
@@ -130,7 +142,13 @@ func TestRun(t *testing.T) {
 		// because git-credentials were found:
 		// (wrap in double quotes so that bash eval doesn't consume the inner single quote.
 		`GIT_CONFIG_PARAMETERS="` + gitCredentialHelpers + `"`,
+		"BUILDKITE_ACCESS_KEY='buildkite access key'",
+		"DATABASE_SECRET='database secret'",
+		"EXTERNAL_API_SECRET_KEY='external api secret'",
+		"PRIVILEGED_PASSWORD='privileged password'",
+		"SERVICE_TOKEN='service token'",
 	}, "\n") + "\n"
+
 	if actual := envSink.String(); expected != actual {
 		t.Errorf("unexpected env written:\n-%q\n+%q", expected, actual)
 	}

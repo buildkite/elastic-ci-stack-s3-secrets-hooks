@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"io/ioutil"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -20,7 +21,7 @@ import (
 )
 
 type Client struct {
-	s3 *s3.Client
+	s3     *s3.Client
 	bucket string
 	region string
 }
@@ -82,17 +83,17 @@ func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
 	}
 
 	return &Client{
-		s3: s3.NewFromConfig(awsConfig),
+		s3:     s3.NewFromConfig(awsConfig),
 		bucket: bucket,
 		region: awsConfig.Region,
 	}, nil
 }
 
-func (c *Client) Bucket() (string) {
+func (c *Client) Bucket() string {
 	return c.bucket
 }
 
-func (c *Client) Region() (string) {
+func (c *Client) Region() string {
 	return c.region
 }
 
@@ -126,6 +127,33 @@ func (c *Client) Get(key string) ([]byte, error) {
 	// we probably should return io.Reader or io.ReadCloser rather than []byte,
 	// maybe somebody should refactor that (and all the tests etc) one day.
 	return ioutil.ReadAll(out.Body)
+}
+
+// ListSuffix returns a list of keys in the bucket that have the given prefix and suffix.
+// This has a maximum of 1000 keys, for now. This can be expanded by using the continuation token.
+func (c *Client) ListSuffix(prefix string, suffixes []string) ([]string, error) {
+	var resp *s3.ListObjectsV2Output
+	var keys []string
+	resp, err := c.s3.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+		Bucket: &c.bucket,
+		Prefix: &prefix,
+	})
+
+	// Iterate over all objects at the prefix and find those who match our suffix
+	for i, object := range resp.Contents {
+		for _, suffix := range suffixes {
+			if strings.HasSuffix(*object.Key, suffix) {
+				keys = append(keys, *object.Key)
+				resp.Contents = append(resp.Contents[:i], resp.Contents[i+1:]...) //since we have a match, pop it
+				break                                                             //... then break out of the suffix loop
+			}
+		}
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("Could not ListObjectsV2 (%s) in bucket (%s). Ensure your IAM Identity has s3:ListBucket permission for this bucket. (%v)", prefix, c.bucket, err)
+	}
+	return keys, nil
 }
 
 // BucketExists returns whether the bucket exists.
