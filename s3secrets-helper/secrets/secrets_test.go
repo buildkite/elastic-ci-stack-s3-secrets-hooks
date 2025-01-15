@@ -5,7 +5,9 @@ import (
 	"errors"
 	"io"
 	"log"
+	"maps"
 	"math/rand"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -16,8 +18,9 @@ import (
 )
 
 type FakeClient struct {
-	t    *testing.T
-	data map[string]FakeObject
+	t      *testing.T
+	data   map[string]FakeObject
+	bucket string
 }
 
 type FakeObject struct {
@@ -25,9 +28,9 @@ type FakeObject struct {
 	err  error
 }
 
-func (c *FakeClient) Get(bucket, key string) ([]byte, error) {
+func (c *FakeClient) Get(key string) ([]byte, error) {
 	time.Sleep(time.Duration(rand.Int()%100) * time.Millisecond)
-	path := bucket + "/" + key
+	path := c.bucket + "/" + key
 	if result, ok := c.data[path]; ok {
 		c.t.Logf("FakeClient Get %s: %d bytes, error: %v", path, len(result.data), result.err)
 		return result.data, result.err
@@ -36,8 +39,21 @@ func (c *FakeClient) Get(bucket, key string) ([]byte, error) {
 	return nil, sentinel.ErrNotFound
 }
 
-func (c *FakeClient) BucketExists(bucket string) (bool, error) {
+func (c *FakeClient) BucketExists() (bool, error) {
 	return true, nil
+}
+
+func (c *FakeClient) Bucket() string {
+	return c.bucket
+}
+
+func (c *FakeClient) ListSuffix(prefix string, suffix []string) ([]string, error) {
+	fakeSecrets := []string{"pipeline/BUILDKITE_ACCESS_KEY", "pipeline/DATABASE_SECRET", "pipeline/EXTERNAL_API_SECRET_KEY", "pipeline/PRIVILEGED_PASSWORD", "pipeline/SERVICE_TOKEN"}
+	return fakeSecrets, nil
+}
+
+func (c *FakeClient) Region() string {
+	return "us-west-2"
 }
 
 type FakeAgent struct {
@@ -78,6 +94,13 @@ echo Agent pid 42
 }
 
 func TestRun(t *testing.T) {
+	fakeSecretsData := map[string]FakeObject{
+		"bkt/pipeline/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
+		"bkt/pipeline/DATABASE_SECRET":         {[]byte("database secret"), nil},
+		"bkt/pipeline/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
+		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
+		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
+	}
 	fakeData := map[string]FakeObject{
 		"bkt/pipeline/private_ssh_key": {nil, sentinel.ErrNotFound},
 		"bkt/pipeline/id_rsa_github":   {[]byte("pipeline key"), nil},
@@ -89,12 +112,6 @@ func TestRun(t *testing.T) {
 		"bkt/pipeline/env":         {nil, sentinel.ErrNotFound},
 		"bkt/pipeline/environment": {[]byte("C=three"), nil},
 
-		"bkt/pipeline/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
-		"bkt/pipeline/DATABASE_SECRET":         {[]byte("database secret"), nil},
-		"bkt/pipeline/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
-		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
-		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
-
 		"bkt/git-credentials":          {[]byte("general git key"), nil},
 		"bkt/pipeline/git-credentials": {[]byte("pipeline git key"), nil},
 
@@ -104,6 +121,7 @@ func TestRun(t *testing.T) {
 		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
 		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
 	}
+	maps.Copy(fakeData, fakeSecretsData)
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
 	envSink := &bytes.Buffer{}
@@ -112,7 +130,7 @@ func TestRun(t *testing.T) {
 		Repo:                "git@github.com:buildkite/bash-example.git",
 		Bucket:              "bkt",
 		Prefix:              "pipeline",
-		Client:              &FakeClient{t: t, data: fakeData},
+		Client:              &FakeClient{t: t, data: fakeData, bucket: "bkt"},
 		Logger:              log.New(logbuf, "", log.LstdFlags),
 		SSHAgent:            fakeAgent,
 		EnvSink:             envSink,
@@ -127,8 +145,8 @@ func TestRun(t *testing.T) {
 
 	// verify env
 	gitCredentialHelpers := strings.Join([]string{
-		`'credential.helper=/path/to/git-credential-s3-secrets bkt git-credentials'`,
-		`'credential.helper=/path/to/git-credential-s3-secrets bkt pipeline/git-credentials'`,
+		`'credential.helper=/path/to/git-credential-s3-secrets bkt us-west-2 git-credentials'`,
+		`'credential.helper=/path/to/git-credential-s3-secrets bkt us-west-2 pipeline/git-credentials'`,
 	}, " ")
 	expected := strings.Join([]string{
 		// because an SSH key was found, ssh-agent was started:
@@ -152,6 +170,7 @@ func TestRun(t *testing.T) {
 	if actual := envSink.String(); expected != actual {
 		t.Errorf("unexpected env written:\n-%q\n+%q", expected, actual)
 	}
+	assertEnvMapping(t, fakeSecretsData, makeEnvMap(os.Environ()))
 	t.Logf("hook log:\n%s", logbuf.String())
 }
 
