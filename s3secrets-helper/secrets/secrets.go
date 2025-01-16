@@ -140,7 +140,8 @@ func getSecrets(conf Config, results chan<- getResult) {
 		"_TOKEN",
 		"_ACCESS_KEY",
 	}...)
-	keys, err := conf.Client.ListSuffix(conf.Prefix, suffixes)
+	secretPrefix := conf.Prefix + "/secret-files"
+	keys, err := conf.Client.ListSuffix(secretPrefix, suffixes)
 	if err != nil {
 		fmt.Errorf("listing matching secrets: %w", err)
 	}

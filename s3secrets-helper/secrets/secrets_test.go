@@ -46,7 +46,7 @@ func (c *FakeClient) Bucket() string {
 }
 
 func (c *FakeClient) ListSuffix(prefix string, suffix []string) ([]string, error) {
-	fakeSecrets := []string{"pipeline/BUILDKITE_ACCESS_KEY", "pipeline/DATABASE_SECRET", "pipeline/EXTERNAL_API_SECRET_KEY", "pipeline/PRIVILEGED_PASSWORD", "pipeline/SERVICE_TOKEN"}
+	fakeSecrets := []string{"pipeline/secret-files/BUILDKITE_ACCESS_KEY", "pipeline/secret-files/DATABASE_SECRET", "pipeline/secret-files/EXTERNAL_API_SECRET_KEY", "pipeline/secret-files/PRIVILEGED_PASSWORD", "pipeline/secret-files/SERVICE_TOKEN"}
 	return fakeSecrets, nil
 }
 
@@ -106,11 +106,11 @@ func TestRun(t *testing.T) {
 		"bkt/git-credentials":          {[]byte("general git key"), nil},
 		"bkt/pipeline/git-credentials": {[]byte("pipeline git key"), nil},
 
-		"bkt/pipeline/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
-		"bkt/pipeline/DATABASE_SECRET":         {[]byte("database secret"), nil},
-		"bkt/pipeline/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
-		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
-		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
+		"bkt/pipeline/secret-files/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
+		"bkt/pipeline/secret-files/DATABASE_SECRET":         {[]byte("database secret"), nil},
+		"bkt/pipeline/secret-files/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
+		"bkt/pipeline/secret-files/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
+		"bkt/pipeline/secret-files/SERVICE_TOKEN":           {[]byte("service token"), nil},
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
