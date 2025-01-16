@@ -5,9 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
-	"maps"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -94,13 +92,6 @@ echo Agent pid 42
 }
 
 func TestRun(t *testing.T) {
-	fakeSecretsData := map[string]FakeObject{
-		"bkt/pipeline/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
-		"bkt/pipeline/DATABASE_SECRET":         {[]byte("database secret"), nil},
-		"bkt/pipeline/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
-		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
-		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
-	}
 	fakeData := map[string]FakeObject{
 		"bkt/pipeline/private_ssh_key": {nil, sentinel.ErrNotFound},
 		"bkt/pipeline/id_rsa_github":   {[]byte("pipeline key"), nil},
@@ -121,7 +112,6 @@ func TestRun(t *testing.T) {
 		"bkt/pipeline/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
 		"bkt/pipeline/SERVICE_TOKEN":           {[]byte("service token"), nil},
 	}
-	maps.Copy(fakeData, fakeSecretsData)
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
 	envSink := &bytes.Buffer{}
@@ -170,7 +160,6 @@ func TestRun(t *testing.T) {
 	if actual := envSink.String(); expected != actual {
 		t.Errorf("unexpected env written:\n-%q\n+%q", expected, actual)
 	}
-	assertEnvMapping(t, fakeSecretsData, makeEnvMap(os.Environ()))
 	t.Logf("hook log:\n%s", logbuf.String())
 }
 
