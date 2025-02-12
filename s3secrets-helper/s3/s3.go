@@ -140,16 +140,11 @@ func (c *Client) ListSuffix(prefix string, suffixes []string) ([]string, error) 
 	})
 
 	// Iterate over all objects at the prefix and find those who match our suffix
-	for i, object := range resp.Contents {
+	for _, object := range resp.Contents {
 		for _, suffix := range suffixes {
 			if strings.HasSuffix(*object.Key, suffix) {
-				if i < len(resp.Contents)-1 {
-					keys = append(keys, *object.Key)
-					resp.Contents = append(resp.Contents[:i], resp.Contents[i+1:]...) //since we have a match, pop it
-					break                                                             //... then break out of the suffix loop
-				} else {
-					keys = append(keys, *object.Key) // No need to pop the object as we are at the end of the list
-				} //... then break out of the suffix loop
+				keys = append(keys, *object.Key)
+				break //break out of the suffix loop
 			}
 		}
 	}
