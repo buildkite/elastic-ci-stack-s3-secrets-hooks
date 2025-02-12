@@ -12,9 +12,10 @@ import (
 
 // Client represents interaction with AWS S3
 type Client interface {
-	Bucket() (string)
-	Region() (string)
+	Bucket() string
+	Region() string
 	Get(key string) ([]byte, error)
+	ListSuffix(prefix string, suffix []string) ([]string, error)
 	BucketExists() (bool, error)
 }
 
@@ -52,6 +53,10 @@ type Config struct {
 
 	// GitCredentialHelper is the path to git-credential-s3-secrets
 	GitCredentialHelper string
+
+	// Secret suffixes to look for in S3.
+	// Defaults to "_SECRET", "_SECRET_KEY", "_PASSWORD", "_TOKEN", and "_ACCESS_KEY"
+	SecretSuffixes []string
 }
 
 // Run is the programmatic (as opposed to CLI) entrypoint to all
@@ -81,6 +86,9 @@ func Run(conf Config) error {
 	resultsGit := make(chan getResult)
 	getGitCredentials(conf, resultsGit)
 
+	resultsSecrets := make(chan getResult)
+	getSecrets(conf, resultsSecrets)
+
 	if err := handleSSHKeys(conf, resultsSSH); err != nil {
 		return err
 	}
@@ -88,6 +96,9 @@ func Run(conf Config) error {
 		return err
 	}
 	if err := handleGitCredentials(conf, resultsGit); err != nil {
+		return err
+	}
+	if err := handleSecrets(conf, resultsSecrets); err != nil {
 		return err
 	}
 	return nil
@@ -117,6 +128,22 @@ func getEnvs(conf Config, results chan<- getResult) {
 	conf.Logger.Printf("Checking S3 for environment files:")
 	for _, k := range keys {
 		conf.Logger.Printf("- %s", k)
+	}
+	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
+}
+
+func getSecrets(conf Config, results chan<- getResult) {
+	suffixes := append(conf.SecretSuffixes, []string{
+		"_SECRET",
+		"_SECRET_KEY",
+		"_PASSWORD",
+		"_TOKEN",
+		"_ACCESS_KEY",
+	}...)
+	secretPrefix := conf.Prefix + "/secret-files"
+	keys, err := conf.Client.ListSuffix(secretPrefix, suffixes)
+	if err != nil {
+		fmt.Errorf("listing matching secrets: %w", err)
 	}
 	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
 }
@@ -227,12 +254,46 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 		// Replace backslash '\' with double backslash '\\'
 		helper = strings.ReplaceAll(helper, "\\", "\\\\")
 
-		singleQuotedHelpers = append(singleQuotedHelpers, "'" + helper + "'")
+		singleQuotedHelpers = append(singleQuotedHelpers, "'"+helper+"'")
 	}
 	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(singleQuotedHelpers, " ") + "\"\n"
 
 	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
 		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
+	}
+	return nil
+}
+
+// handleSecrets loads secrets into the environment.
+// The key is the last part of the S3 key.
+func handleSecrets(conf Config, results <-chan getResult) error {
+	log := conf.Logger
+	// Build an environment variable for interpretation by a shell
+	var singleQuotedSecrets []string
+	var envString string
+	for r := range results {
+		if r.err != nil {
+			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
+				log.Printf("+++ :warning: Failed to download secret %s/%s: %v", r.bucket, r.key, r.err)
+			}
+			continue
+		}
+		log.Printf("Adding secret %s/%s to environment", r.bucket, r.key)
+		envKey := strings.Split(r.key, "/")[len(strings.Split(r.key, "/"))-1]
+
+		// Replace backslash '\' with double backslash '\\'
+		value := strings.ReplaceAll(string(r.data), "\\", "\\\\")
+
+		singleQuotedSecrets = append(singleQuotedSecrets, envKey+"='"+value+"'")
+
+	}
+	if len(singleQuotedSecrets) == 0 {
+		log.Printf("No secrets found in %q", conf.Prefix)
+		return nil
+	}
+	envString = strings.Join(singleQuotedSecrets, "\n") + "\n"
+	if _, err := io.WriteString(conf.EnvSink, envString); err != nil {
+		return fmt.Errorf("writing SECRETS to env: %w", err)
 	}
 	return nil
 }

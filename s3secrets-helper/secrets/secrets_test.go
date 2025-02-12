@@ -16,8 +16,9 @@ import (
 )
 
 type FakeClient struct {
-	t    *testing.T
-	data map[string]FakeObject
+	t      *testing.T
+	data   map[string]FakeObject
+	bucket string
 }
 
 type FakeObject struct {
@@ -25,9 +26,9 @@ type FakeObject struct {
 	err  error
 }
 
-func (c *FakeClient) Get(bucket, key string) ([]byte, error) {
+func (c *FakeClient) Get(key string) ([]byte, error) {
 	time.Sleep(time.Duration(rand.Int()%100) * time.Millisecond)
-	path := bucket + "/" + key
+	path := c.bucket + "/" + key
 	if result, ok := c.data[path]; ok {
 		c.t.Logf("FakeClient Get %s: %d bytes, error: %v", path, len(result.data), result.err)
 		return result.data, result.err
@@ -36,8 +37,21 @@ func (c *FakeClient) Get(bucket, key string) ([]byte, error) {
 	return nil, sentinel.ErrNotFound
 }
 
-func (c *FakeClient) BucketExists(bucket string) (bool, error) {
+func (c *FakeClient) BucketExists() (bool, error) {
 	return true, nil
+}
+
+func (c *FakeClient) Bucket() string {
+	return c.bucket
+}
+
+func (c *FakeClient) ListSuffix(prefix string, suffix []string) ([]string, error) {
+	fakeSecrets := []string{"pipeline/secret-files/BUILDKITE_ACCESS_KEY", "pipeline/secret-files/DATABASE_SECRET", "pipeline/secret-files/EXTERNAL_API_SECRET_KEY", "pipeline/secret-files/PRIVILEGED_PASSWORD", "pipeline/secret-files/SERVICE_TOKEN"}
+	return fakeSecrets, nil
+}
+
+func (c *FakeClient) Region() string {
+	return "us-west-2"
 }
 
 type FakeAgent struct {
@@ -91,6 +105,12 @@ func TestRun(t *testing.T) {
 
 		"bkt/git-credentials":          {[]byte("general git key"), nil},
 		"bkt/pipeline/git-credentials": {[]byte("pipeline git key"), nil},
+
+		"bkt/pipeline/secret-files/BUILDKITE_ACCESS_KEY":    {[]byte("buildkite access key"), nil},
+		"bkt/pipeline/secret-files/DATABASE_SECRET":         {[]byte("database secret"), nil},
+		"bkt/pipeline/secret-files/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
+		"bkt/pipeline/secret-files/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
+		"bkt/pipeline/secret-files/SERVICE_TOKEN":           {[]byte("service token"), nil},
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
@@ -100,7 +120,7 @@ func TestRun(t *testing.T) {
 		Repo:                "git@github.com:buildkite/bash-example.git",
 		Bucket:              "bkt",
 		Prefix:              "pipeline",
-		Client:              &FakeClient{t: t, data: fakeData},
+		Client:              &FakeClient{t: t, data: fakeData, bucket: "bkt"},
 		Logger:              log.New(logbuf, "", log.LstdFlags),
 		SSHAgent:            fakeAgent,
 		EnvSink:             envSink,
@@ -115,8 +135,8 @@ func TestRun(t *testing.T) {
 
 	// verify env
 	gitCredentialHelpers := strings.Join([]string{
-		`'credential.helper=/path/to/git-credential-s3-secrets bkt git-credentials'`,
-		`'credential.helper=/path/to/git-credential-s3-secrets bkt pipeline/git-credentials'`,
+		`'credential.helper=/path/to/git-credential-s3-secrets bkt us-west-2 git-credentials'`,
+		`'credential.helper=/path/to/git-credential-s3-secrets bkt us-west-2 pipeline/git-credentials'`,
 	}, " ")
 	expected := strings.Join([]string{
 		// because an SSH key was found, ssh-agent was started:
@@ -130,7 +150,13 @@ func TestRun(t *testing.T) {
 		// because git-credentials were found:
 		// (wrap in double quotes so that bash eval doesn't consume the inner single quote.
 		`GIT_CONFIG_PARAMETERS="` + gitCredentialHelpers + `"`,
+		"BUILDKITE_ACCESS_KEY='buildkite access key'",
+		"DATABASE_SECRET='database secret'",
+		"EXTERNAL_API_SECRET_KEY='external api secret'",
+		"PRIVILEGED_PASSWORD='privileged password'",
+		"SERVICE_TOKEN='service token'",
 	}, "\n") + "\n"
+
 	if actual := envSink.String(); expected != actual {
 		t.Errorf("unexpected env written:\n-%q\n+%q", expected, actual)
 	}

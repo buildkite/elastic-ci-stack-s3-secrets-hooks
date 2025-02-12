@@ -7,6 +7,12 @@ Different types of secrets are supported and exposed to your builds in appropria
 - `ssh-agent` for SSH Private Keys
 - Environment Variables for strings
 - `git-credential` via git's credential.helper
+- Other secrets, which must be suffixed with one of the following:
+  - `_SECRET`
+  - `_SECRET_KEY`
+  - `_PASSWORD`
+  - `_TOKEN`
+  - `_ACCESS_KEY`
 
 ## Installation
 
@@ -55,9 +61,10 @@ When run via the agent environment and pre-exit hook, your builds will check in 
 - `s3://{bucket_name}/private_ssh_key`
 - `s3://{bucket_name}/environment` or `s3://{bucket_name}/env`
 - `s3://{bucket_name}/git-credentials`
+- `s3://{bucket_name}/secret-files/`
 
 The private key is exposed to both the checkout and the command as an ssh-agent instance.
-The secrets in the env file are exposed as environment variables.
+The secrets in the env file are exposed as environment variables, as are individual secret files.
 The locations of git-credentials are passed via `GIT_CONFIG_PARAMETERS` environment to git.
 
 ## Uploading Secrets
@@ -98,6 +105,16 @@ Key values pairs can also be uploaded.
 
 ```bash
 aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment"
+```
+
+### Individual Secrets
+
+Individual secrets with a suffix of `_SECRET`, `_SECRET_KEY`, `_PASSWORD`, `_TOKEN`, or `_ACCESS_KEY` can be uploaded to the same location as the rest of your configuration, under an additional prefix of `/secret-files/`.
+
+The file contents should be the secret value, and the object key becomes the environment variable name. For example:
+
+```bash
+aws s3 cp --acl private --sse aws:kms <(echo "<SECRET_VALUE>") "s3://${secrets_bucket}/secret-files/SPECIAL_SECRET"
 ```
 
 ## Options
