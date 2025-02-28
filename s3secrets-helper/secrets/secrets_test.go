@@ -192,6 +192,36 @@ func TestNoneFound(t *testing.T) {
 	t.Logf("hook log:\n%s", logbuf.String())
 }
 
+func TestNoneFoundWithDisabledWarning(t *testing.T) {
+	fakeData := map[string]FakeObject{}
+	logbuf := &bytes.Buffer{}
+	fakeAgent := &FakeAgent{t: t, keys: []string{}}
+	envSink := &bytes.Buffer{}
+
+	conf := secrets.Config{
+		Repo:                      "git@github.com:buildkite/bash-example.git",
+		Bucket:                    "bkt",
+		Prefix:                    "pipeline",
+		Logger:                    log.New(logbuf, "", log.LstdFlags),
+		Client:                    &FakeClient{t: t, data: fakeData},
+		SSHAgent:                  fakeAgent,
+		EnvSink:                   envSink,
+		SkipSSHKeyNotFoundWarning: true,
+	}
+	if err := secrets.Run(conf); err != nil {
+		t.Error(err)
+	}
+	assertDeepEqual(t, []string{}, fakeAgent.keys)
+	if envSink.Len() != 0 {
+		t.Errorf("expected envSink to be empty, got %q", envSink.String())
+	}
+	unexpectedWarning := "+++ :warning: Failed to find an SSH key in secret bucket"
+	if strings.Contains(logbuf.String(), unexpectedWarning) {
+		t.Error("unexpected warning about no SSH keys for git@... repo")
+	}
+	t.Logf("hook log:\n%s", logbuf.String())
+}
+
 func assertDeepEqual(t *testing.T, expected, actual interface{}) {
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected %q, got %q", expected, actual)
