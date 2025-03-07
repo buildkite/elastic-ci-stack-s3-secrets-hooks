@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/env"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/s3"
@@ -48,13 +49,19 @@ func mainWithError(log *log.Logger) error {
 	}
 
 	return secrets.Run(secrets.Config{
-		Repo:                os.Getenv(env.EnvRepo),
-		Bucket:              bucket,
-		Prefix:              prefix,
-		Client:              client,
-		Logger:              log,
-		SSHAgent:            agent,
-		EnvSink:             os.Stdout,
-		GitCredentialHelper: credHelper,
+		Repo:                      os.Getenv(env.EnvRepo),
+		Bucket:                    bucket,
+		Prefix:                    prefix,
+		Client:                    client,
+		Logger:                    log,
+		SSHAgent:                  agent,
+		EnvSink:                   os.Stdout,
+		GitCredentialHelper:       credHelper,
+		SkipSSHKeyNotFoundWarning: isEnvVarEnabled(env.EnvSkipSSHKeyNotFoundWarning),
 	})
+}
+
+func isEnvVarEnabled(envVar string) bool {
+	value := os.Getenv(envVar)
+	return strings.ToLower(value) == "true" || value == "1"
 }

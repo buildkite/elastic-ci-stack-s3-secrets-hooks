@@ -57,6 +57,10 @@ type Config struct {
 	// Secret suffixes to look for in S3.
 	// Defaults to "_SECRET", "_SECRET_KEY", "_PASSWORD", "_TOKEN", and "_ACCESS_KEY"
 	SecretSuffixes []string
+
+	// SkipSSHKeyNotFoundWarning suppresses the warning when no SSH key is found
+	// Defaults to false
+	SkipSSHKeyNotFoundWarning bool
 }
 
 // Run is the programmatic (as opposed to CLI) entrypoint to all
@@ -184,7 +188,7 @@ func handleSSHKeys(conf Config, results <-chan getResult) error {
 		}
 		keyFound = true
 	}
-	if !keyFound && strings.HasPrefix(conf.Repo, "git@") {
+	if !keyFound && strings.HasPrefix(conf.Repo, "git@") && !conf.SkipSSHKeyNotFoundWarning {
 		log.Printf("+++ :warning: Failed to find an SSH key in secret bucket")
 		log.Printf(
 			"The repository %q appears to use SSH for transport, but the elastic-ci-stack-s3-secrets-hooks plugin did not find any SSH keys in the %q S3 bucket.",
