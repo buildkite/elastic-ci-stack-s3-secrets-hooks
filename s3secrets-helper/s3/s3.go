@@ -20,7 +20,7 @@ import (
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
 )
 
-type Client struct {
+type S3Client struct {
 	s3     *s3.Client
 	bucket string
 	region string
@@ -41,7 +41,7 @@ func getCurrentRegion(ctx context.Context) (string, error) {
 	return "", errors.New("Unknown current region")
 }
 
-func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
+func New(log *log.Logger, bucket string, regionHint string) (*S3Client, error) {
 	ctx := context.Background()
 
 	var awsConfig aws.Config
@@ -82,18 +82,26 @@ func New(log *log.Logger, bucket string, regionHint string) (*Client, error) {
 		}
 	}
 
-	return &Client{
+	return &S3Client{
 		s3:     s3.NewFromConfig(awsConfig),
 		bucket: bucket,
 		region: awsConfig.Region,
 	}, nil
 }
 
-func (c *Client) Bucket() string {
+func NewFromConfig(cfg aws.Config, bucket string) *S3Client {
+	return &S3Client{
+		s3:     s3.NewFromConfig(cfg),
+		bucket: bucket,
+		region: cfg.Region,
+	}
+}
+
+func (c *S3Client) Bucket() string {
 	return c.bucket
 }
 
-func (c *Client) Region() string {
+func (c *S3Client) Region() string {
 	return c.region
 }
 
@@ -101,7 +109,7 @@ func (c *Client) Region() string {
 // Intended for small files; object is fully read into memory.
 // sentinel.ErrNotFound and sentinel.ErrForbidden are returned for those cases.
 // Other errors are returned verbatim.
-func (c *Client) Get(key string) ([]byte, error) {
+func (c *S3Client) Get(key string) ([]byte, error) {
 	out, err := c.s3.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &c.bucket,
 		Key:    &key,
@@ -131,13 +139,20 @@ func (c *Client) Get(key string) ([]byte, error) {
 
 // ListSuffix returns a list of keys in the bucket that have the given prefix and suffix.
 // This has a maximum of 1000 keys, for now. This can be expanded by using the continuation token.
-func (c *Client) ListSuffix(prefix string, suffixes []string) ([]string, error) {
+func (c *S3Client) ListSuffix(prefix string, suffixes []string) ([]string, error) {
 	var resp *s3.ListObjectsV2Output
 	var keys []string
-	resp, err := c.s3.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+
+	ctx := context.Background()
+
+	resp, err := c.s3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &c.bucket,
 		Prefix: &prefix,
 	})
+
+	if err != nil {
+		return nil, fmt.Errorf("Could not ListObjectsV2 (%s) in bucket (%s). Ensure your IAM Identity has s3:ListBucket permission for this bucket. (%v)", prefix, c.bucket, err)
+	}
 
 	// Iterate over all objects at the prefix and find those who match our suffix
 	for _, object := range resp.Contents {
@@ -149,9 +164,6 @@ func (c *Client) ListSuffix(prefix string, suffixes []string) ([]string, error) 
 		}
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("Could not ListObjectsV2 (%s) in bucket (%s). Ensure your IAM Identity has s3:ListBucket permission for this bucket. (%v)", prefix, c.bucket, err)
-	}
 	return keys, nil
 }
 
@@ -159,7 +171,7 @@ func (c *Client) ListSuffix(prefix string, suffixes []string) ([]string, error) 
 // 200 OK returns true without error.
 // 404 Not Found and 403 Forbidden return false without error.
 // Other errors result in false with an error.
-func (c *Client) BucketExists() (bool, error) {
+func (c *S3Client) BucketExists() (bool, error) {
 	if _, err := c.s3.HeadBucket(context.TODO(), &s3.HeadBucketInput{Bucket: &c.bucket}); err != nil {
 		return false, fmt.Errorf("Could not HeadBucket (%s). Ensure your IAM Identity has s3:ListBucket permission for this bucket. (%v)", c.bucket, err)
 	}
