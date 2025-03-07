@@ -58,10 +58,12 @@ When run via the agent environment and pre-exit hook, your builds will check in 
 - `s3://{bucket_name}/{pipeline}/private_ssh_key`
 - `s3://{bucket_name}/{pipeline}/environment` or `s3://{bucket_name}/{pipeline}/env`
 - `s3://{bucket_name}/{pipeline}/git-credentials`
+- `s3://{bucket_name}/{pipeline}/secret-files/`
 - `s3://{bucket_name}/private_ssh_key`
 - `s3://{bucket_name}/environment` or `s3://{bucket_name}/env`
 - `s3://{bucket_name}/git-credentials`
 - `s3://{bucket_name}/secret-files/`
+
 
 The private key is exposed to both the checkout and the command as an ssh-agent instance.
 The secrets in the env file are exposed as environment variables, as are individual secret files.
