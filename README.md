@@ -123,19 +123,19 @@ aws s3 cp --acl private --sse aws:kms <(echo "<SECRET_VALUE>") "s3://${secrets_b
 
 There are a few environment variables you can configure for the s3secrets helper. You can set these options in an environment hook. 
 
-### `BUILDKITE_PLUGIN_S3_SECRETS_BUCKET`
+#### `BUILDKITE_PLUGIN_S3_SECRETS_BUCKET`
 
 An s3 bucket to look for secrets in. This can be configured via the BUILDKITE_PLUGIN_S3_SECRETS_BUCKET env var. 
 
-### `BUILDKITE_PLUGIN_S3_SECRETS_REGION`
+#### `BUILDKITE_PLUGIN_S3_SECRETS_REGION`
 
 The s3 bucket region to use when it cannot derive from both the configured bucket and the local AWS config.
 
-### `BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV`
+#### `BUILDKITE_PLUGIN_S3_SECRETS_DUMP_ENV`
 
 Enable debugging of the configured environment variables by dumping these variables in the job logs when true. False by default.
 
-### `BUILDKITE_PLUGIN_S3_SECRETS_SKIP_SSH_KEY_NOT_FOUND_WARNING`
+#### `BUILDKITE_PLUGIN_S3_SECRETS_SKIP_SSH_KEY_NOT_FOUND_WARNING`
 
 Suppress log warnings when the repository SSH keys are not configured in the specified s3 secrets bucket when true. This can be useful when SSH Keys are configured outside the s3 secrets bucket. False by default.
 
