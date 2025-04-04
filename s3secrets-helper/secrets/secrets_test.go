@@ -46,8 +46,17 @@ func (c *FakeClient) Bucket() string {
 }
 
 func (c *FakeClient) ListSuffix(prefix string, suffix []string) ([]string, error) {
-	fakeSecrets := []string{"pipeline/secret-files/BUILDKITE_ACCESS_KEY", "pipeline/secret-files/DATABASE_SECRET", "pipeline/secret-files/EXTERNAL_API_SECRET_KEY", "pipeline/secret-files/PRIVILEGED_PASSWORD", "pipeline/secret-files/SERVICE_TOKEN"}
-	return fakeSecrets, nil
+	if prefix == "pipeline/secret-files" {
+		fakeSecrets := []string{"pipeline/secret-files/BUILDKITE_ACCESS_KEY", "pipeline/secret-files/DATABASE_SECRET",
+			"pipeline/secret-files/EXTERNAL_API_SECRET_KEY", "pipeline/secret-files/PRIVILEGED_PASSWORD", "pipeline/secret-files/SERVICE_TOKEN"}
+		return fakeSecrets, nil
+	}
+
+	if prefix == "secret-files" {
+		fakeSecrets := []string{"secret-files/ORG_SERVICE_TOKEN"}
+		return fakeSecrets, nil
+	}
+	return nil, nil
 }
 
 func (c *FakeClient) Region() string {
@@ -111,6 +120,7 @@ func TestRun(t *testing.T) {
 		"bkt/pipeline/secret-files/EXTERNAL_API_SECRET_KEY": {[]byte("external api secret"), nil},
 		"bkt/pipeline/secret-files/PRIVILEGED_PASSWORD":     {[]byte("privileged password"), nil},
 		"bkt/pipeline/secret-files/SERVICE_TOKEN":           {[]byte("service token"), nil},
+		"bkt/secret-files/ORG_SERVICE_TOKEN":                {[]byte("org service token"), nil},
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
@@ -155,6 +165,7 @@ func TestRun(t *testing.T) {
 		"EXTERNAL_API_SECRET_KEY='external api secret'",
 		"PRIVILEGED_PASSWORD='privileged password'",
 		"SERVICE_TOKEN='service token'",
+		"ORG_SERVICE_TOKEN='org service token'",
 	}, "\n") + "\n"
 
 	if actual := envSink.String(); expected != actual {

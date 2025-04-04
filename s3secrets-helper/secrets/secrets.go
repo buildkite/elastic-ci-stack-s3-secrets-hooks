@@ -144,10 +144,22 @@ func getSecrets(conf Config, results chan<- getResult) {
 		"_TOKEN",
 		"_ACCESS_KEY",
 	}...)
-	secretPrefix := conf.Prefix + "/secret-files"
-	keys, err := conf.Client.ListSuffix(secretPrefix, suffixes)
-	if err != nil {
-		fmt.Errorf("listing matching secrets: %w", err)
+
+	prefixes := []string{
+		conf.Prefix + "/secret-files",
+		"secret-files",
+	}
+
+	conf.Logger.Printf("Checking S3 for secret-files")
+	keys := []string{}
+	for _, p := range prefixes {
+		conf.Logger.Printf("- %s", p)
+		files, err := conf.Client.ListSuffix(p, suffixes)
+		if err != nil {
+			fmt.Errorf("listing matching secrets: %w", err)
+			continue
+		}
+		keys = append(keys, files...)
 	}
 	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
 }
