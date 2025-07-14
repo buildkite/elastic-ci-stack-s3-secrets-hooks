@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-load '/usr/local/lib/bats/load.bash'
+load '/usr/lib/bats/load.bash'
 
 # export AWS_STUB_DEBUG=/dev/tty
 # export SSH_ADD_STUB_DEBUG=/dev/tty

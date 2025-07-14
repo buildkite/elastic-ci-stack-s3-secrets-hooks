@@ -146,8 +146,8 @@ func getSecrets(conf Config, results chan<- getResult) {
 	}...)
 
 	prefixes := []string{
-		conf.Prefix + "/secret-files",
 		"secret-files",
+		conf.Prefix + "/secret-files",
 	}
 
 	conf.Logger.Printf("Checking S3 for secret-files")
