@@ -1,11 +1,11 @@
 package env
 
 const (
-	EnvBucket     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
-	EnvRegion     = "BUILDKITE_PLUGIN_S3_SECRETS_REGION"
-	EnvPrefix     = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
-	EnvPipeline   = "BUILDKITE_PIPELINE_SLUG"
-	EnvRepo       = "BUILDKITE_REPO"
-	EnvCredHelper = "BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER"
+	EnvBucket                    = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET"
+	EnvRegion                    = "BUILDKITE_PLUGIN_S3_SECRETS_REGION"
+	EnvPrefix                    = "BUILDKITE_PLUGIN_S3_SECRETS_BUCKET_PREFIX"
+	EnvPipeline                  = "BUILDKITE_PIPELINE_SLUG"
+	EnvRepo                      = "BUILDKITE_REPO"
+	EnvCredHelper                = "BUILDKITE_PLUGIN_S3_SECRETS_CREDHELPER"
 	EnvSkipSSHKeyNotFoundWarning = "BUILDKITE_PLUGIN_S3_SECRETS_SKIP_SSH_KEY_NOT_FOUND_WARNING"
 )

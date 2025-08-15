@@ -2,12 +2,27 @@ package secrets
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
+)
+
+const (
+	// MaxSecretSize is the maximum size for a secret to be redacted (64KB) as per Agent limitations.
+	// Secrets larger than this will generate a warning and be skipped.
+	MaxSecretSize = 65536
+	// MaxJSONChunkSize is the maximum size for a JSON chunk sent to buildkite-agent (1MB).
+	// This is a conservative limit that helps with optimization, but it may be adjusted in the future as the Agent doesn't impose a limit.
+	MaxJSONChunkSize = 1024 * 1024
+	// BaseJSONOverhead estimates the minimum JSON structure size (braces, quotes, etc.)
+	// used as a starting point for chunk size calculations.
+	BaseJSONOverhead = 50
 )
 
 // Client represents interaction with AWS S3
@@ -61,12 +76,22 @@ type Config struct {
 	// SkipSSHKeyNotFoundWarning suppresses the warning when no SSH key is found
 	// Defaults to false
 	SkipSSHKeyNotFoundWarning bool
+
+	// secretsToRedact collects all secrets to redact in a single batch
+	secretsToRedact []string
+}
+
+// SecretsToRedact returns a copy of the collected secrets for use in tests.
+func (c *Config) SecretsToRedact() []string {
+	result := make([]string, len(c.secretsToRedact))
+	copy(result, c.secretsToRedact)
+	return result
 }
 
 // Run is the programmatic (as opposed to CLI) entrypoint to all
 // functionality; secrets are downloaded from S3, and loaded into ssh-agent
 // etc.
-func Run(conf Config) error {
+func Run(conf *Config) error {
 	bucket := conf.Client.Bucket()
 	log := conf.Logger
 
@@ -82,16 +107,16 @@ func Run(conf Config) error {
 	}
 
 	resultsSSH := make(chan getResult)
-	getSSHKeys(conf, resultsSSH)
+	getSSHKeys(*conf, resultsSSH)
 
 	resultsEnv := make(chan getResult)
-	getEnvs(conf, resultsEnv)
+	getEnvs(*conf, resultsEnv)
 
 	resultsGit := make(chan getResult)
-	getGitCredentials(conf, resultsGit)
+	getGitCredentials(*conf, resultsGit)
 
 	resultsSecrets := make(chan getResult)
-	getSecrets(conf, resultsSecrets)
+	getSecrets(*conf, resultsSecrets)
 
 	if err := handleSSHKeys(conf, resultsSSH); err != nil {
 		return err
@@ -105,6 +130,15 @@ func Run(conf Config) error {
 	if err := handleSecrets(conf, resultsSecrets); err != nil {
 		return err
 	}
+
+	if len(conf.secretsToRedact) > 0 {
+		if err := batchRedactSecrets(conf.Logger, conf.secretsToRedact); err != nil {
+			conf.Logger.Printf("Warning: Failed to add secrets to redactor: %v", err)
+		}
+	} else {
+		conf.Logger.Printf("No secrets collected for redaction")
+	}
+
 	return nil
 }
 
@@ -156,7 +190,7 @@ func getSecrets(conf Config, results chan<- getResult) {
 		conf.Logger.Printf("- %s", p)
 		files, err := conf.Client.ListSuffix(p, suffixes)
 		if err != nil {
-			fmt.Errorf("listing matching secrets: %w", err)
+			conf.Logger.Printf("+++ :warning: Failed to list secrets: %v", err)
 			continue
 		}
 		keys = append(keys, files...)
@@ -176,7 +210,7 @@ func getGitCredentials(conf Config, results chan<- getResult) {
 	go GetAll(conf.Client, conf.Client.Bucket(), keys, results)
 }
 
-func handleSSHKeys(conf Config, results <-chan getResult) error {
+func handleSSHKeys(conf *Config, results <-chan getResult) error {
 	log := conf.Logger
 	keyFound := false
 	for r := range results {
@@ -214,7 +248,7 @@ func handleSSHKeys(conf Config, results <-chan getResult) error {
 	return nil
 }
 
-func handleEnvs(conf Config, results <-chan getResult) error {
+func handleEnvs(conf *Config, results <-chan getResult) error {
 	log := conf.Logger
 	for r := range results {
 		if r.err != nil {
@@ -230,6 +264,32 @@ func handleEnvs(conf Config, results <-chan getResult) error {
 				data = append(data, '\n')
 			}
 			log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
+
+			envContent := string(r.data)
+			lines := strings.Split(envContent, "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+
+				if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
+					value := strings.TrimSpace(parts[1])
+
+					if len(value) >= 2 &&
+						((value[0] == '"' && value[len(value)-1] == '"') ||
+							(value[0] == '\'' && value[len(value)-1] == '\'')) {
+						value = value[1 : len(value)-1]
+					}
+
+					if len(value) > 0 && len(value) < MaxSecretSize {
+						redactSecret(conf, value)
+					} else if len(value) >= MaxSecretSize {
+						log.Printf("Warning: Environment variable value is too large for redaction (%d bytes, max %d bytes)", len(value), MaxSecretSize)
+					}
+				}
+			}
+
 			if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
 				return fmt.Errorf("copying env: %w", err)
 			}
@@ -238,7 +298,7 @@ func handleEnvs(conf Config, results <-chan getResult) error {
 	return nil
 }
 
-func handleGitCredentials(conf Config, results <-chan getResult) error {
+func handleGitCredentials(conf *Config, results <-chan getResult) error {
 	log := conf.Logger
 	var helpers []string
 	for r := range results {
@@ -282,7 +342,7 @@ func handleGitCredentials(conf Config, results <-chan getResult) error {
 
 // handleSecrets loads secrets into the environment.
 // The key is the last part of the S3 key.
-func handleSecrets(conf Config, results <-chan getResult) error {
+func handleSecrets(conf *Config, results <-chan getResult) error {
 	log := conf.Logger
 	// Build an environment variable for interpretation by a shell
 	var singleQuotedSecrets []string
@@ -297,8 +357,14 @@ func handleSecrets(conf Config, results <-chan getResult) error {
 		log.Printf("Adding secret %s/%s to environment", r.bucket, r.key)
 		envKey := strings.Split(r.key, "/")[len(strings.Split(r.key, "/"))-1]
 
-		// Replace backslash '\' with double backslash '\\'
 		value := strings.ReplaceAll(string(r.data), "\\", "\\\\")
+
+		secretData := string(r.data)
+		if len(secretData) > 0 && len(secretData) < MaxSecretSize {
+			redactSecret(conf, secretData)
+		} else if len(secretData) >= MaxSecretSize {
+			log.Printf("Warning: Secret %s is too large for redaction (%d bytes, max %d bytes)", envKey, len(secretData), MaxSecretSize)
+		}
 
 		singleQuotedSecrets = append(singleQuotedSecrets, envKey+"='"+value+"'")
 
@@ -349,4 +415,272 @@ func GetAll(c Client, bucket string, keys []string, results chan<- getResult) {
 		link = nextLink // our `nextLink` becomes `link` for the next goroutine.
 	}
 	close(<-link) // wait for final goroutine, close results channel
+}
+
+func redactSecret(conf *Config, secretValue string) {
+	secretValue = strings.TrimSpace(secretValue)
+	if secretValue == "" {
+		return
+	}
+
+	for _, existing := range conf.secretsToRedact {
+		if existing == secretValue {
+			return
+		}
+	}
+
+	conf.secretsToRedact = append(conf.secretsToRedact, secretValue)
+}
+
+// AgentCapabilities holds detected agent version and capabilities
+type AgentCapabilities struct {
+	Version        string
+	SupportsRedact bool
+	SupportsJSON   bool
+}
+
+// detectAgentCapabilities discovers what the buildkite-agent supports.
+// We detect the actual version and check which redaction features are available
+// by examining the help output rather than making assumptions based on version ranges.
+func detectAgentCapabilities() AgentCapabilities {
+	caps := AgentCapabilities{
+		Version:        "unknown",
+		SupportsRedact: false,
+		SupportsJSON:   false,
+	}
+
+	// Extract version from "buildkite-agent, e.g. version 3.73.0, build 12345"
+	versionCmd := exec.Command("buildkite-agent", "--version")
+	if versionOutput, err := versionCmd.Output(); err == nil {
+		versionStr := strings.TrimSpace(string(versionOutput))
+		if parts := strings.Fields(versionStr); len(parts) >= 3 {
+			caps.Version = parts[2]
+		}
+	}
+
+	// Test if redactor command exists at all
+	cmd := exec.Command("buildkite-agent", "redactor", "add", "--help")
+	output, err := cmd.Output()
+	if err != nil {
+		return caps
+	}
+
+	caps.SupportsRedact = true
+
+	// Check for JSON format support by looking for both the --format flag
+	// and "json" as a valid format option. We use both conditions to avoid
+	// false positives where "json" might appear elsewhere in help text.
+	helpText := string(output)
+	hasFormatOption := strings.Contains(helpText, "--format")
+	hasJSONValue := strings.Contains(helpText, "json") || strings.Contains(helpText, "'json'") || strings.Contains(helpText, `"json"`)
+	caps.SupportsJSON = hasFormatOption && hasJSONValue
+
+	return caps
+}
+
+func batchRedactSecrets(log *log.Logger, secrets []string) error {
+	if len(secrets) == 0 {
+		return nil
+	}
+
+	if _, err := exec.LookPath("buildkite-agent"); err != nil {
+		log.Printf("Warning: buildkite-agent not found, secrets will not be redacted")
+		return nil
+	}
+
+	caps := detectAgentCapabilities()
+
+	if !caps.SupportsRedact {
+		log.Printf("Warning: agent %s doesn't support secret redaction", caps.Version)
+		log.Printf("Upgrade to buildkite-agent v3.66.0 or later for automatic secret redaction")
+		return nil
+	}
+
+	// Clean up the secrets list by removing empty entries.
+	// We pre-allocate capacity since most secrets will be valid.
+	validSecrets := make([]string, 0, len(secrets))
+	for _, secret := range secrets {
+		if trimmed := strings.TrimSpace(secret); trimmed != "" {
+			validSecrets = append(validSecrets, trimmed)
+		}
+	}
+
+	if len(validSecrets) == 0 {
+		return nil
+	}
+
+	// Choose redaction strategy based on agent capabilities:
+	// JSON format for efficient batch processing for newer agents (optimal)
+	// Individual files to redact one-by-one fallback for older agents where batching isn't possible (less optimal)
+	// else, warn that we can't redact secrets (sadge)
+	if caps.SupportsJSON {
+		chunks := chunkSecrets(validSecrets, MaxJSONChunkSize)
+		log.Printf("Processing %d secrets in %d chunk(s) using JSON format", len(validSecrets), len(chunks))
+
+		successfulChunks := 0
+		for i, chunk := range chunks {
+			if err := processSingleChunk(log, chunk, i+1, len(chunks)); err != nil {
+				log.Printf("Warning: failed to process chunk %d/%d, some secrets may appear in logs", i+1, len(chunks))
+			} else {
+				successfulChunks++
+			}
+		}
+
+		if successfulChunks > 0 {
+			log.Printf("Successfully added %d secrets to redactor (%d/%d chunks)", len(validSecrets), successfulChunks, len(chunks))
+		}
+	} else {
+		log.Printf("Agent %s detected, using individual file redaction for %d secrets", caps.Version, len(validSecrets))
+		log.Printf("For better performance, upgrade to buildkite-agent v3.73.0 or later")
+		return redactIndividually(log, validSecrets)
+	}
+
+	return nil
+}
+
+// chunkSecrets splits a large list of secrets into smaller chunks that fit within
+// the specified JSON size limit. This prevents buildkite-agent from rejecting
+// oversized files while maintaining the efficiency of batch processing.
+func chunkSecrets(secrets []string, maxJSONSize int) [][]string {
+	if len(secrets) == 0 {
+		return nil
+	}
+
+	var chunks [][]string
+	currentChunk := []string{}
+	currentSize := BaseJSONOverhead
+
+	// Calculate the JSON size for each secret including:
+	// Key name ("secret_N": )
+	// JSON escaping for quotes and backslashes
+	// Structural overhead (quotes, colons, commas)
+	for _, secret := range secrets {
+		keySize := len(`"secret_`) + len(fmt.Sprintf("%d", len(currentChunk))) + len(`":`) + 3
+		secretSize := len(secret) + strings.Count(secret, `"`) + strings.Count(secret, `\`)
+		secretJSONSize := keySize + secretSize
+
+		if len(currentChunk) > 0 && currentSize+secretJSONSize > maxJSONSize {
+			chunks = append(chunks, currentChunk)
+			currentChunk = []string{secret}
+			currentSize = BaseJSONOverhead + secretJSONSize
+		} else {
+			currentChunk = append(currentChunk, secret)
+			currentSize += secretJSONSize
+		}
+	}
+
+	if len(currentChunk) > 0 {
+		chunks = append(chunks, currentChunk)
+	}
+
+	return chunks
+}
+
+// processSingleChunk handles one chunk of secrets by creating a temporary JSON file
+// and passing it to buildkite-agent for redaction. The file is securely created
+// and cleaned up regardless of success or failure.
+func processSingleChunk(log *log.Logger, secrets []string, chunkNum, totalChunks int) error {
+	jsonSecrets := make(map[string]string)
+	for i, secret := range secrets {
+		jsonSecrets[fmt.Sprintf("secret_%d", i)] = secret
+	}
+
+	jsonData, err := json.Marshal(jsonSecrets)
+	if err != nil {
+		return fmt.Errorf("failed to marshal chunk %d to JSON: %w", chunkNum, err)
+	}
+
+	tempFile, err := os.CreateTemp("", fmt.Sprintf("buildkite-secrets-chunk-%d-*.json", chunkNum))
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file for chunk %d: %w", chunkNum, err)
+	}
+
+	// Ensure the temporary file is always cleaned up, even if something goes wrong.
+	// Set restrictive permissions (0600) so only the current user can read the secrets.
+	defer func() {
+		tempFile.Close()
+		if err := os.Remove(tempFile.Name()); err != nil {
+			log.Printf("Warning: failed to remove temporary secrets file %s", tempFile.Name())
+		}
+	}()
+
+	if err := tempFile.Chmod(0600); err != nil {
+		return fmt.Errorf("failed to set permissions on temporary file for chunk %d: %w", chunkNum, err)
+	}
+
+	if _, err := tempFile.Write(jsonData); err != nil {
+		return fmt.Errorf("failed to write chunk %d to temporary file: %w", chunkNum, err)
+	}
+
+	if err := tempFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync temporary file for chunk %d: %w", chunkNum, err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file for chunk %d: %w", chunkNum, err)
+	}
+
+	cmd := exec.Command("buildkite-agent", "redactor", "add", "--format", "json", tempFile.Name())
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("buildkite-agent command failed for chunk %d: %w", chunkNum, err)
+	}
+
+	log.Printf("Processed chunk %d/%d (%d secrets, %d bytes)",
+		chunkNum, totalChunks, len(secrets), len(jsonData))
+
+	return nil
+}
+
+// redactIndividually processes secrets one at a time for older agents that don't
+// support JSON format. This is slower but works with all agent versions above 3.66.0.
+func redactIndividually(log *log.Logger, secrets []string) error {
+	log.Printf("Processing %d secrets individually (this may take a moment)...", len(secrets))
+	successCount := 0
+
+	for i, secret := range secrets {
+		if secret == "" {
+			continue
+		}
+
+		// Create a temporary file for each secret. We use an anonymous function
+		// to ensure proper cleanup even if individual operations fail.
+		func() {
+			tempFile, err := os.CreateTemp("", "secret-*.txt")
+			if err != nil {
+				log.Printf("Warning: failed to create temp file for secret %d: %v", i+1, err)
+				return
+			}
+			defer os.Remove(tempFile.Name())
+			defer tempFile.Close()
+
+			if _, err := tempFile.WriteString(secret); err != nil {
+				log.Printf("Warning: failed to write secret %d to temp file: %v", i+1, err)
+				return
+			}
+
+			if err := tempFile.Close(); err != nil {
+				log.Printf("Warning: failed to close temp file for secret %d: %v", i+1, err)
+				return
+			}
+
+			cmd := exec.Command("buildkite-agent", "redactor", "add", tempFile.Name())
+			if err := cmd.Run(); err != nil {
+				log.Printf("Warning: failed to redact secret %d: %v", i+1, err)
+				return
+			}
+
+			successCount++
+		}()
+	}
+
+	if successCount > 0 {
+		log.Printf("Successfully redacted %d/%d secrets", successCount, len(secrets))
+	} else {
+		log.Printf("Warning: failed to redact any secrets")
+	}
+
+	return nil
 }

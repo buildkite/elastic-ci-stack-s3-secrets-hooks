@@ -32,9 +32,11 @@ type Agent struct {
 // If ssh-agent has already been started, do nothing.
 // If SSH_AUTH_SOCK & SSH_AGENT_PID are set, adopt those.
 // Otherwise, start an ssh-agent, which produces output like:
-//     SSH_AUTH_SOCK=/path/to/socket; export SSH_AUTH_SOCK;
-//     SSH_AGENT_PID=42; export SSH_AGENT_PID;
-//     echo Agent pid 42
+//
+//	SSH_AUTH_SOCK=/path/to/socket; export SSH_AUTH_SOCK;
+//	SSH_AGENT_PID=42; export SSH_AGENT_PID;
+//	echo Agent pid 42
+//
 // The output is captured verbatim, and also parsed for those values.
 // The SSH_AUTH_SOCK in either case is used for subsequent Add()
 // The bool return value indicates whether the call started the agent.

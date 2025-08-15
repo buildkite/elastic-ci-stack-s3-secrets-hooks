@@ -136,7 +136,7 @@ func TestRun(t *testing.T) {
 		EnvSink:             envSink,
 		GitCredentialHelper: "/path/to/git-credential-s3-secrets",
 	}
-	if err := secrets.Run(conf); err != nil {
+	if err := secrets.Run(&conf); err != nil {
 		t.Error(err)
 	}
 
@@ -189,7 +189,7 @@ func TestNoneFound(t *testing.T) {
 		SSHAgent: fakeAgent,
 		EnvSink:  envSink,
 	}
-	if err := secrets.Run(conf); err != nil {
+	if err := secrets.Run(&conf); err != nil {
 		t.Error(err)
 	}
 	assertDeepEqual(t, []string{}, fakeAgent.keys)
@@ -219,7 +219,7 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 		EnvSink:                   envSink,
 		SkipSSHKeyNotFoundWarning: true,
 	}
-	if err := secrets.Run(conf); err != nil {
+	if err := secrets.Run(&conf); err != nil {
 		t.Error(err)
 	}
 	assertDeepEqual(t, []string{}, fakeAgent.keys)
