@@ -132,7 +132,7 @@ func Run(conf *Config) error {
 	}
 
 	if len(conf.secretsToRedact) > 0 {
-		if err := batchRedactSecrets(conf.Logger, conf.secretsToRedact); err != nil {
+		if err := redactSecrets(conf.Logger, conf.secretsToRedact); err != nil {
 			conf.Logger.Printf("Warning: Failed to add secrets to redactor: %v", err)
 		}
 	} else {
@@ -434,22 +434,20 @@ func redactSecret(conf *Config, secretValue string) {
 
 // AgentCapabilities holds detected agent version and capabilities
 type AgentCapabilities struct {
-	Version        string
-	SupportsRedact bool
-	SupportsJSON   bool
+	Version          string
+	SupportsRedactor bool
 }
 
 // detectAgentCapabilities discovers what the buildkite-agent supports.
-// We detect the actual version and check which redaction features are available
-// by examining the help output rather than making assumptions based on version ranges.
+// We detect the actual version and check if the redactor command exists.
+// JSON format support is guaranteed when redactor is available.
 func detectAgentCapabilities() AgentCapabilities {
 	caps := AgentCapabilities{
-		Version:        "unknown",
-		SupportsRedact: false,
-		SupportsJSON:   false,
+		Version:          "unknown",
+		SupportsRedactor: false,
 	}
 
-	// Extract version from "buildkite-agent, e.g. version 3.73.0, build 12345"
+	// Extract version from "buildkite-agent, e.g. version 3.73.0"
 	versionCmd := exec.Command("buildkite-agent", "--version")
 	if versionOutput, err := versionCmd.Output(); err == nil {
 		versionStr := strings.TrimSpace(string(versionOutput))
@@ -458,27 +456,29 @@ func detectAgentCapabilities() AgentCapabilities {
 		}
 	}
 
-	// Test if redactor command exists at all
+	// Test if redactor command exists
 	cmd := exec.Command("buildkite-agent", "redactor", "add", "--help")
 	output, err := cmd.Output()
 	if err != nil {
+		// Command failed completely (e.g., buildkite-agent not found)
 		return caps
 	}
 
-	caps.SupportsRedact = true
-
-	// Check for JSON format support by looking for both the --format flag
-	// and "json" as a valid format option. We use both conditions to avoid
-	// false positives where "json" might appear elsewhere in help text.
+	// Check if the command actually succeeded by looking for redactor-specific content
+	// If "redactor" isn't supported, buildkite-agent shows general help instead
 	helpText := string(output)
-	hasFormatOption := strings.Contains(helpText, "--format")
-	hasJSONValue := strings.Contains(helpText, "json") || strings.Contains(helpText, "'json'") || strings.Contains(helpText, `"json"`)
-	caps.SupportsJSON = hasFormatOption && hasJSONValue
+	if !strings.Contains(helpText, "redactor") {
+		// Command ran but redactor subcommand doesn't exist
+		return caps
+	}
+
+	// Redactor command exists
+	caps.SupportsRedactor = true
 
 	return caps
 }
 
-func batchRedactSecrets(log *log.Logger, secrets []string) error {
+func redactSecrets(log *log.Logger, secrets []string) error {
 	if len(secrets) == 0 {
 		return nil
 	}
@@ -490,9 +490,9 @@ func batchRedactSecrets(log *log.Logger, secrets []string) error {
 
 	caps := detectAgentCapabilities()
 
-	if !caps.SupportsRedact {
+	if !caps.SupportsRedactor {
 		log.Printf("Warning: agent %s doesn't support secret redaction", caps.Version)
-		log.Printf("Upgrade to buildkite-agent v3.66.0 or later for automatic secret redaction")
+		log.Printf("Upgrade to buildkite-agent v3.67.0 or later for automatic secret redaction")
 		return nil
 	}
 
@@ -509,30 +509,21 @@ func batchRedactSecrets(log *log.Logger, secrets []string) error {
 		return nil
 	}
 
-	// Choose redaction strategy based on agent capabilities:
-	// JSON format for efficient batch processing for newer agents (optimal)
-	// Individual files to redact one-by-one fallback for older agents where batching isn't possible (less optimal)
-	// else, warn that we can't redact secrets (sadge)
-	if caps.SupportsJSON {
-		chunks := chunkSecrets(validSecrets, MaxJSONChunkSize)
-		log.Printf("Processing %d secrets in %d chunk(s) using JSON format", len(validSecrets), len(chunks))
+	// Use JSON batch processing for efficiency
+	chunks := chunkSecrets(validSecrets, MaxJSONChunkSize)
+	log.Printf("Processing %d secrets in %d chunk(s) using JSON format", len(validSecrets), len(chunks))
 
-		successfulChunks := 0
-		for i, chunk := range chunks {
-			if err := processSingleChunk(log, chunk, i+1, len(chunks)); err != nil {
-				log.Printf("Warning: failed to process chunk %d/%d, some secrets may appear in logs", i+1, len(chunks))
-			} else {
-				successfulChunks++
-			}
+	successfulChunks := 0
+	for i, chunk := range chunks {
+		if err := processSingleChunk(log, chunk, i+1, len(chunks)); err != nil {
+			log.Printf("Warning: failed to process chunk %d/%d, some secrets may appear in logs", i+1, len(chunks))
+		} else {
+			successfulChunks++
 		}
+	}
 
-		if successfulChunks > 0 {
-			log.Printf("Successfully added %d secrets to redactor (%d/%d chunks)", len(validSecrets), successfulChunks, len(chunks))
-		}
-	} else {
-		log.Printf("Agent %s detected, using individual file redaction for %d secrets", caps.Version, len(validSecrets))
-		log.Printf("For better performance, upgrade to buildkite-agent v3.73.0 or later")
-		return redactIndividually(log, validSecrets)
+	if successfulChunks > 0 {
+		log.Printf("Successfully added %d secrets to redactor (%d/%d chunks)", len(validSecrets), successfulChunks, len(chunks))
 	}
 
 	return nil
@@ -577,8 +568,7 @@ func chunkSecrets(secrets []string, maxJSONSize int) [][]string {
 }
 
 // processSingleChunk handles one chunk of secrets by creating a temporary JSON file
-// and passing it to buildkite-agent for redaction. The file is securely created
-// and cleaned up regardless of success or failure.
+// and passing it to buildkite-agent for redaction. The file is created and cleaned up regardless of success or failure.
 func processSingleChunk(log *log.Logger, secrets []string, chunkNum, totalChunks int) error {
 	jsonSecrets := make(map[string]string)
 	for i, secret := range secrets {
@@ -630,57 +620,6 @@ func processSingleChunk(log *log.Logger, secrets []string, chunkNum, totalChunks
 
 	log.Printf("Processed chunk %d/%d (%d secrets, %d bytes)",
 		chunkNum, totalChunks, len(secrets), len(jsonData))
-
-	return nil
-}
-
-// redactIndividually processes secrets one at a time for older agents that don't
-// support JSON format. This is slower but works with all agent versions above 3.66.0.
-func redactIndividually(log *log.Logger, secrets []string) error {
-	log.Printf("Processing %d secrets individually (this may take a moment)...", len(secrets))
-	successCount := 0
-
-	for i, secret := range secrets {
-		if secret == "" {
-			continue
-		}
-
-		// Create a temporary file for each secret. We use an anonymous function
-		// to ensure proper cleanup even if individual operations fail.
-		func() {
-			tempFile, err := os.CreateTemp("", "secret-*.txt")
-			if err != nil {
-				log.Printf("Warning: failed to create temp file for secret %d: %v", i+1, err)
-				return
-			}
-			defer os.Remove(tempFile.Name())
-			defer tempFile.Close()
-
-			if _, err := tempFile.WriteString(secret); err != nil {
-				log.Printf("Warning: failed to write secret %d to temp file: %v", i+1, err)
-				return
-			}
-
-			if err := tempFile.Close(); err != nil {
-				log.Printf("Warning: failed to close temp file for secret %d: %v", i+1, err)
-				return
-			}
-
-			cmd := exec.Command("buildkite-agent", "redactor", "add", tempFile.Name())
-			if err := cmd.Run(); err != nil {
-				log.Printf("Warning: failed to redact secret %d: %v", i+1, err)
-				return
-			}
-
-			successCount++
-		}()
-	}
-
-	if successCount > 0 {
-		log.Printf("Successfully redacted %d/%d secrets", successCount, len(secrets))
-	} else {
-		log.Printf("Warning: failed to redact any secrets")
-	}
 
 	return nil
 }
