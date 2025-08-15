@@ -496,8 +496,7 @@ func redactSecrets(log *log.Logger, secrets []string) error {
 		return nil
 	}
 
-	// Clean up the secrets list by removing empty entries.
-	// We pre-allocate capacity since most secrets will be valid.
+	// Clean up the secrets list by removing empty entries
 	validSecrets := make([]string, 0, len(secrets))
 	for _, secret := range secrets {
 		if trimmed := strings.TrimSpace(secret); trimmed != "" {
