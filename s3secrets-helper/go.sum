@@ -38,3 +38,5 @@ github.com/aws/smithy-go v1.22.5 h1:P9ATCXPMb2mPjYBgueqJNCA5S9UfktsW0tTxi+a7eqw=
 github.com/aws/smithy-go v1.22.5/go.mod h1:t1ufH5HMublsJYulve2RKmHDC15xu1f26kHCp/HgceI=
 github.com/awsdocs/aws-doc-sdk-examples/gov2/testtools v0.0.0-20250305205910-f85b847ca6da h1:+SYXpcEy9JKkpaJp9JM1pKTBIi++DnNbwykRx7MEsn8=
 github.com/awsdocs/aws-doc-sdk-examples/gov2/testtools v0.0.0-20250305205910-f85b847ca6da/go.mod h1:9Oj/8PZn3D5Ftp/Z1QWrIEFE0daERMqfJawL9duHRfc=
+github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
+github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=

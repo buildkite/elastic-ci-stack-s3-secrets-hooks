@@ -160,12 +160,12 @@ func TestRun(t *testing.T) {
 		// because git-credentials were found:
 		// (wrap in double quotes so that bash eval doesn't consume the inner single quote.
 		`GIT_CONFIG_PARAMETERS="` + gitCredentialHelpers + `"`,
-		"ORG_SERVICE_TOKEN='org service token'",
-		"BUILDKITE_ACCESS_KEY='buildkite access key'",
-		"DATABASE_SECRET='database secret'",
-		"EXTERNAL_API_SECRET_KEY='external api secret'",
-		"PRIVILEGED_PASSWORD='privileged password'",
-		"SERVICE_TOKEN='service token'",
+		`ORG_SERVICE_TOKEN="org service token"`,
+		`BUILDKITE_ACCESS_KEY="buildkite access key"`,
+		`DATABASE_SECRET="database secret"`,
+		`EXTERNAL_API_SECRET_KEY="external api secret"`,
+		`PRIVILEGED_PASSWORD="privileged password"`,
+		`SERVICE_TOKEN="service token"`,
 	}, "\n") + "\n"
 
 	if actual := envSink.String(); expected != actual {

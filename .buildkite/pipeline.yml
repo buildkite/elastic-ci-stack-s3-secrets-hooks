@@ -72,10 +72,12 @@ steps:
 
   - wait
 
-  - label: ":bash: :hammer:"
+  - label: ":go: Unit Tests"
     plugins:
-      docker-compose#v2.2.0:
+      docker-compose#v5.10.0:
+        config: .buildkite/docker-compose.yml
         run: tests
+    command: .buildkite/steps/tests.sh
 
   - label: "㊙️ git-credentials test"
     command: .buildkite/test_credentials.sh

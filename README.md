@@ -69,6 +69,12 @@ The private key is exposed to both the checkout and the command as an ssh-agent 
 The secrets in the env file are exposed as environment variables, as are individual secret files.
 The locations of git-credentials are passed via `GIT_CONFIG_PARAMETERS` environment to git.
 
+## Secret Redaction
+
+When using Buildkite Agent v3.67.0 or later, secrets are automatically redacted from build logs to prevent accidental exposure. The plugin will detect the agent version and use the built-in redactor feature when available.
+
+For agents running older versions, a warning will be displayed recommending an upgrade for enhanced security.
+
 ## Uploading Secrets
 
 ### SSH Keys

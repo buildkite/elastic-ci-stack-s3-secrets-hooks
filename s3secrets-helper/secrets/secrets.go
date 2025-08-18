@@ -8,9 +8,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/sentinel"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -42,7 +45,8 @@ type Agent interface {
 	Stdout() io.Reader
 }
 
-// Config holds all the parameters for Run()
+// All functions use *Config (pointer receivers) because we accumulate secrets in secretsToRedact across multiple handler functions,
+// which avoids copying struct containing 3 interfaces (Client, Agent, io.Writer) and 2 slices and maintains consistent API - all handlers can modify shared state
 type Config struct {
 	// Repo from BUILDKITE_REPO
 	Repo string
@@ -81,16 +85,12 @@ type Config struct {
 	secretsToRedact []string
 }
 
-// SecretsToRedact returns a copy of the collected secrets for use in tests.
-func (c *Config) SecretsToRedact() []string {
-	result := make([]string, len(c.secretsToRedact))
-	copy(result, c.secretsToRedact)
-	return result
-}
-
 // Run is the programmatic (as opposed to CLI) entrypoint to all
 // functionality; secrets are downloaded from S3, and loaded into ssh-agent
 // etc.
+
+// Takes *Config because we need to collect secrets in secretsToRedact
+// as we process different S3 objects, then batch them for redaction at the end
 func Run(conf *Config) error {
 	bucket := conf.Client.Bucket()
 	log := conf.Logger
@@ -265,27 +265,15 @@ func handleEnvs(conf *Config, results <-chan getResult) error {
 			}
 			log.Printf("Loading %s/%s (%d bytes) of env", r.bucket, r.key, len(r.data))
 
-			envContent := string(r.data)
-			lines := strings.Split(envContent, "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if line == "" || strings.HasPrefix(line, "#") {
-					continue
-				}
-
-				if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
-					value := strings.TrimSpace(parts[1])
-
-					if len(value) >= 2 &&
-						((value[0] == '"' && value[len(value)-1] == '"') ||
-							(value[0] == '\'' && value[len(value)-1] == '\'')) {
-						value = value[1 : len(value)-1]
-					}
-
-					if len(value) > 0 && len(value) < MaxSecretSize {
+			// Parse the environment file to extract values for redaction
+			// Use godotenv library to properly handle multi-line secrets and avoid parsing bugs
+			envMap, err := godotenv.UnmarshalBytes(r.data)
+			if err != nil {
+				log.Printf("Warning: failed to parse env file %s/%s: %v", r.bucket, r.key, err)
+			} else {
+				for _, value := range envMap {
+					if len(value) > 0 {
 						redactSecret(conf, value)
-					} else if len(value) >= MaxSecretSize {
-						log.Printf("Warning: Environment variable value is too large for redaction (%d bytes, max %d bytes)", len(value), MaxSecretSize)
 					}
 				}
 			}
@@ -357,17 +345,23 @@ func handleSecrets(conf *Config, results <-chan getResult) error {
 		log.Printf("Adding secret %s/%s to environment", r.bucket, r.key)
 		envKey := strings.Split(r.key, "/")[len(strings.Split(r.key, "/"))-1]
 
-		value := strings.ReplaceAll(string(r.data), "\\", "\\\\")
-
+		// Redact both original and shell-escaped versions of the secret to prevent leaks
+		// This fixes an issue where multi-line secrets (like JWT tokens) would appear
+		// unredacted in logs when strconv.Quote transforms them (e.g., newlines > \n).
 		secretData := string(r.data)
-		if len(secretData) > 0 && len(secretData) < MaxSecretSize {
+		if len(secretData) > 0 {
 			redactSecret(conf, secretData)
-		} else if len(secretData) >= MaxSecretSize {
-			log.Printf("Warning: Secret %s is too large for redaction (%d bytes, max %d bytes)", envKey, len(secretData), MaxSecretSize)
 		}
 
-		singleQuotedSecrets = append(singleQuotedSecrets, envKey+"='"+value+"'")
+		quotedValue := strconv.Quote(secretData)
+		if len(quotedValue) >= 2 {
+			unquotedContent := quotedValue[1 : len(quotedValue)-1]
+			if unquotedContent != secretData {
+				redactSecret(conf, unquotedContent)
+			}
+		}
 
+		singleQuotedSecrets = append(singleQuotedSecrets, envKey+"="+quotedValue)
 	}
 	if len(singleQuotedSecrets) == 0 {
 		log.Printf("No secrets found in %q", conf.Prefix)
@@ -418,18 +412,19 @@ func GetAll(c Client, bucket string, keys []string, results chan<- getResult) {
 }
 
 func redactSecret(conf *Config, secretValue string) {
-	secretValue = strings.TrimSpace(secretValue)
 	if secretValue == "" {
 		return
 	}
 
-	for _, existing := range conf.secretsToRedact {
-		if existing == secretValue {
-			return
-		}
+	if len(secretValue) >= MaxSecretSize {
+		conf.Logger.Printf("Warning: Secret is too large for redaction (%d bytes, max %d bytes)", len(secretValue), MaxSecretSize)
+		return
 	}
 
-	conf.secretsToRedact = append(conf.secretsToRedact, secretValue)
+	// Check if we already have this secret to avoid unnecessary operations
+	if !slices.Contains(conf.secretsToRedact, secretValue) {
+		conf.secretsToRedact = append(conf.secretsToRedact, secretValue)
+	}
 }
 
 // AgentCapabilities holds detected agent version and capabilities

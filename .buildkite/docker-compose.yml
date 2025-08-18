@@ -11,6 +11,13 @@ services:
     environment:
       - GOOS
       - GOARCH
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile-compile
+    volumes:
+      - ../:/work:cached
+    working_dir: /work
   release:
     build:
       dockerfile: Dockerfile-release
