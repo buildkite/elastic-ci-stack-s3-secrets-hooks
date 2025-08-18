@@ -122,3 +122,19 @@ steps:
           env:
             - GITHUB_RELEASE_ACCESS_TOKEN
 
+  - label: ":shell: Tests"
+    plugins:
+      - plugin-tester#v1.2.0:
+          folders:
+            - tests
+
+  - label: ":sparkles: Lint"
+    plugins:
+      - plugin-linter#v3.3.0:
+          id: elastic-ci-stack-s3-secrets-hooks
+
+  - label: ":shell: Shellcheck"
+    plugins:
+      - shellcheck#v1.4.0:
+          files:
+            - hooks/**
