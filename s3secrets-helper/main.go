@@ -48,7 +48,7 @@ func mainWithError(log *log.Logger) error {
 		return fmt.Errorf("The %s environment variable is required, set it to the path of the git-credential-s3-secrets script.", env.EnvCredHelper)
 	}
 
-	return secrets.Run(secrets.Config{
+	return secrets.Run(&secrets.Config{
 		Repo:                      os.Getenv(env.EnvRepo),
 		Bucket:                    bucket,
 		Prefix:                    prefix,

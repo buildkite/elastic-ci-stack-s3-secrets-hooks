@@ -26,4 +26,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.27.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.32.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.36.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 )
