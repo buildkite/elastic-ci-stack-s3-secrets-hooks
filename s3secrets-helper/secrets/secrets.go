@@ -240,7 +240,7 @@ func handleSSHKeys(conf *Config, results <-chan getResult) error {
 			"The repository %q appears to use SSH for transport, but the elastic-ci-stack-s3-secrets-hooks plugin did not find any SSH keys in the %q S3 bucket.",
 			conf.Repo, conf.Bucket,
 		)
-		log.Printf("See https://github.com/buildkite/elastic-ci-stack-for-aws#build-secrets for more information.")
+		log.Printf("See https://buildkite.com/docs/agent/v3/aws/elastic-ci-stack/ec2-linux-and-windows/secrets-bucket for more information.")
 	}
 	if _, err := io.Copy(conf.EnvSink, conf.SSHAgent.Stdout()); err != nil {
 		return fmt.Errorf("copying ssh-agent env: %w", err)
