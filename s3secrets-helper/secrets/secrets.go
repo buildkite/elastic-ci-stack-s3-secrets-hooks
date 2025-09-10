@@ -28,6 +28,15 @@ const (
 	BaseJSONOverhead = 50
 )
 
+// defaultSecretSuffixes contains the default suffixes that identify secret environment variables
+var defaultSecretSuffixes = []string{
+	"_SECRET",
+	"_SECRET_KEY",
+	"_PASSWORD",
+	"_TOKEN",
+	"_ACCESS_KEY",
+}
+
 // Client represents interaction with AWS S3
 type Client interface {
 	Bucket() string
@@ -171,13 +180,7 @@ func getEnvs(conf Config, results chan<- getResult) {
 }
 
 func getSecrets(conf Config, results chan<- getResult) {
-	suffixes := append(conf.SecretSuffixes, []string{
-		"_SECRET",
-		"_SECRET_KEY",
-		"_PASSWORD",
-		"_TOKEN",
-		"_ACCESS_KEY",
-	}...)
+	suffixes := append(conf.SecretSuffixes, defaultSecretSuffixes...)
 
 	prefixes := []string{
 		"secret-files",
@@ -271,8 +274,8 @@ func handleEnvs(conf *Config, results <-chan getResult) error {
 			if err != nil {
 				log.Printf("Warning: failed to parse env file %s/%s: %v", r.bucket, r.key, err)
 			} else {
-				for _, value := range envMap {
-					if len(value) > 0 {
+				for key, value := range envMap {
+					if isSecretVar(key) && len(value) > 0 {
 						redactSecret(conf, value)
 					}
 				}
@@ -372,6 +375,16 @@ func handleSecrets(conf *Config, results <-chan getResult) error {
 		return fmt.Errorf("writing SECRETS to env: %w", err)
 	}
 	return nil
+}
+
+// isSecretVar checks if an environment variable name contains any of the secret suffixes
+func isSecretVar(key string) bool {
+	for _, suffix := range defaultSecretSuffixes {
+		if strings.Contains(key, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 type getResult struct {
