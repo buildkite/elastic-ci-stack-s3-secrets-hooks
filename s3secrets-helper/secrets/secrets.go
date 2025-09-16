@@ -108,7 +108,7 @@ func Run(conf *Config) error {
 
 	if ok, err := conf.Client.BucketExists(); !ok {
 		if err != nil {
-			log.Printf("+++ :warning: Bucket %q not found: %v", bucket, err)
+			log.Printf("+++ :warning: Bucket %q not found", bucket)
 		} else {
 			log.Printf("+++ :warning: Bucket %q doesn't exist", bucket)
 		}
@@ -219,7 +219,7 @@ func handleSSHKeys(conf *Config, results <-chan getResult) error {
 	for r := range results {
 		if r.err != nil {
 			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
-				log.Printf("+++ :warning: Failed to download ssh-key %s/%s: %v", r.bucket, r.key, r.err)
+				log.Printf("+++ :warning: Failed to download ssh-key %s/%s", r.bucket, r.key)
 			}
 			continue
 		}
@@ -233,7 +233,7 @@ func handleSSHKeys(conf *Config, results <-chan getResult) error {
 			r.bucket, r.key, len(r.data), conf.SSHAgent.Pid(),
 		)
 		if err := conf.SSHAgent.Add(r.data); err != nil {
-			return fmt.Errorf("ssh-agent add: %w", err)
+			return fmt.Errorf("failed to add ssh-agent")
 		}
 		keyFound = true
 	}
@@ -246,7 +246,7 @@ func handleSSHKeys(conf *Config, results <-chan getResult) error {
 		log.Printf("See https://buildkite.com/docs/agent/v3/aws/elastic-ci-stack/ec2-linux-and-windows/secrets-bucket for more information.")
 	}
 	if _, err := io.Copy(conf.EnvSink, conf.SSHAgent.Stdout()); err != nil {
-		return fmt.Errorf("copying ssh-agent env: %w", err)
+		return fmt.Errorf("failed in copying ssh-agent env")
 	}
 	return nil
 }
@@ -256,7 +256,7 @@ func handleEnvs(conf *Config, results <-chan getResult) error {
 	for r := range results {
 		if r.err != nil {
 			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
-				log.Printf("+++ :warning: Failed to download env from %s/%s: %v", r.bucket, r.key, r.err)
+				log.Printf("+++ :warning: Failed to download env from %s/%s", r.bucket, r.key)
 			}
 			continue
 		}
@@ -272,7 +272,7 @@ func handleEnvs(conf *Config, results <-chan getResult) error {
 			// Use godotenv library to properly handle multi-line secrets and avoid parsing bugs
 			envMap, err := godotenv.UnmarshalBytes(r.data)
 			if err != nil {
-				log.Printf("Warning: failed to parse env file %s/%s: %v", r.bucket, r.key, err)
+				log.Printf("Warning: failed to parse env file %s/%s", r.bucket, r.key)
 			} else {
 				for key, value := range envMap {
 					if isSecretVar(key) && len(value) > 0 {
@@ -282,7 +282,7 @@ func handleEnvs(conf *Config, results <-chan getResult) error {
 			}
 
 			if _, err := bytes.NewReader(data).WriteTo(conf.EnvSink); err != nil {
-				return fmt.Errorf("copying env: %w", err)
+				return fmt.Errorf("failed to write environment data")
 			}
 		}
 	}
@@ -295,7 +295,7 @@ func handleGitCredentials(conf *Config, results <-chan getResult) error {
 	for r := range results {
 		if r.err != nil {
 			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
-				log.Printf("+++ :warning: Failed to check %s/%s: %v", r.bucket, r.key, r.err)
+				log.Printf("+++ :warning: Failed to check %s/%s", r.bucket, r.key)
 			}
 			continue
 		}
@@ -326,7 +326,7 @@ func handleGitCredentials(conf *Config, results <-chan getResult) error {
 	env := "GIT_CONFIG_PARAMETERS=\"" + strings.Join(singleQuotedHelpers, " ") + "\"\n"
 
 	if _, err := io.WriteString(conf.EnvSink, env); err != nil {
-		return fmt.Errorf("writing GIT_CONFIG_PARAMETERS env: %w", err)
+		return fmt.Errorf("failed to write GIT_CONFIG_PARAMETERS env")
 	}
 	return nil
 }
@@ -341,7 +341,7 @@ func handleSecrets(conf *Config, results <-chan getResult) error {
 	for r := range results {
 		if r.err != nil {
 			if r.err != sentinel.ErrNotFound && r.err != sentinel.ErrForbidden {
-				log.Printf("+++ :warning: Failed to download secret %s/%s: %v", r.bucket, r.key, r.err)
+				log.Printf("+++ :warning: Failed to download secret %s/%s", r.bucket, r.key)
 			}
 			continue
 		}
@@ -372,7 +372,7 @@ func handleSecrets(conf *Config, results <-chan getResult) error {
 	}
 	envString = strings.Join(singleQuotedSecrets, "\n") + "\n"
 	if _, err := io.WriteString(conf.EnvSink, envString); err != nil {
-		return fmt.Errorf("writing SECRETS to env: %w", err)
+		return fmt.Errorf("failed to write secrets to environment")
 	}
 	return nil
 }
@@ -602,15 +602,15 @@ func processSingleChunk(log *log.Logger, secrets []string, chunkNum, totalChunks
 	}()
 
 	if err := tempFile.Chmod(0600); err != nil {
-		return fmt.Errorf("failed to set permissions on temporary file for chunk %d: %w", chunkNum, err)
+		return fmt.Errorf("failed to set permissions on temporary file for chunk %d", chunkNum)
 	}
 
 	if _, err := tempFile.Write(jsonData); err != nil {
-		return fmt.Errorf("failed to write chunk %d to temporary file: %w", chunkNum, err)
+		return fmt.Errorf("failed to write chunk %d to temporary file", chunkNum)
 	}
 
 	if err := tempFile.Sync(); err != nil {
-		return fmt.Errorf("failed to sync temporary file for chunk %d: %w", chunkNum, err)
+		return fmt.Errorf("failed to sync temporary file for chunk %d", chunkNum)
 	}
 
 	if err := tempFile.Close(); err != nil {
