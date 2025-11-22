@@ -42,7 +42,7 @@ func mainWithError(log *log.Logger) error {
 		return err
 	}
 
-	agent := &sshagent.Agent{}
+	sshAgent := &sshagent.Agent{}
 
 	buildkiteAgent := buildkiteagent.New()
 
@@ -57,7 +57,7 @@ func mainWithError(log *log.Logger) error {
 		Prefix:                    prefix,
 		Client:                    client,
 		Logger:                    log,
-		SSHAgent:                  agent,
+		SSHAgent:                  sshAgent,
 		BuildkiteAgent:            buildkiteAgent,
 		EnvSink:                   os.Stdout,
 		GitCredentialHelper:       credHelper,

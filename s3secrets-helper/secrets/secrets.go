@@ -48,8 +48,8 @@ type Client interface {
 	BucketExists() (bool, error)
 }
 
-// Agent represents interaction with an ssh-agent process
-type Agent interface {
+// SSHAgent represents interaction with an ssh-agent process
+type SSHAgent interface {
 	Run() (bool, error)
 	Add(key []byte) error
 	Pid() int
@@ -64,7 +64,7 @@ type BuildkiteAgent interface {
 }
 
 // All functions use *Config (pointer receivers) because we accumulate secrets in secretsToRedact across multiple handler functions,
-// which avoids copying struct containing 4 interfaces (Client, Agent, BuildkiteAgent, io.Writer) and 2 slices and maintains consistent API - all handlers can modify shared state
+// which avoids copying struct containing 4 interfaces (Client, SSHAgent, BuildkiteAgent, io.Writer) and 2 slices and maintains consistent API - all handlers can modify shared state
 type Config struct {
 	// Repo from BUILDKITE_REPO
 	Repo string
@@ -83,7 +83,7 @@ type Config struct {
 	Logger *log.Logger
 
 	// SSHAgent represents an ssh-agent process
-	SSHAgent Agent
+	SSHAgent SSHAgent
 
 	// BuildkiteAgent represents interaction with the buildkite-agent binary
 	BuildkiteAgent BuildkiteAgent

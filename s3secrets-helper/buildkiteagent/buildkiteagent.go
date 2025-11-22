@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-type BuildkiteAgent struct {
+type Agent struct {
 	supportsRedactor bool
 	version          string
 }
 
-func New() *BuildkiteAgent {
+func New() *Agent {
 	b := &BuildkiteAgent{
 		version:          "",
 		supportsRedactor: false,
@@ -21,15 +21,15 @@ func New() *BuildkiteAgent {
 	return b
 }
 
-func (b *BuildkiteAgent) Version() string {
+func (b *Agent) Version() string {
 	return b.version
 }
 
-func (b *BuildkiteAgent) SupportsRedactor() bool {
+func (b *Agent) SupportsRedactor() bool {
 	return b.supportsRedactor
 }	
 
-func (b *BuildkiteAgent) RedactorAddSecretsFromJSON(filepath string) error {
+func (b *Agent) RedactorAddSecretsFromJSON(filepath string) error {
 	cmd := exec.Command("buildkite-agent", "redactor", "add", "--format", "json", filepath)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
@@ -41,7 +41,7 @@ func (b *BuildkiteAgent) RedactorAddSecretsFromJSON(filepath string) error {
 	return nil
 }
 
-func (b *BuildkiteAgent) detectAgentCapabilities() {
+func (b *Agent) detectAgentCapabilities() {
 	_, err := exec.LookPath("buildkite-agent")
 	if err != nil {
 		return

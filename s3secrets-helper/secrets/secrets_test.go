@@ -74,13 +74,13 @@ func (c *FakeClient) Region() string {
 	return "us-west-2"
 }
 
-type FakeAgent struct {
+type FakeSSHAgent struct {
 	t    *testing.T
 	keys []string
 	run  bool
 }
 
-func (a *FakeAgent) Run() (bool, error) {
+func (a *FakeSSHAgent) Run() (bool, error) {
 	if a.run {
 		return false, nil
 	}
@@ -88,20 +88,20 @@ func (a *FakeAgent) Run() (bool, error) {
 	return true, nil
 }
 
-func (a *FakeAgent) Add(key []byte) error {
+func (a *FakeSSHAgent) Add(key []byte) error {
 	if !a.run {
-		return errors.New("Agent must Run() before Add()")
+		return errors.New("SSHAgent must Run() before Add()")
 	}
 	a.t.Logf("FakeAgent Add (%d bytes)", len(key))
 	a.keys = append(a.keys, string(key))
 	return nil
 }
 
-func (a *FakeAgent) Pid() int {
+func (a *FakeSSHAgent) Pid() int {
 	return 42
 }
 
-func (a *FakeAgent) Stdout() io.Reader {
+func (a *FakeSSHAgent) Stdout() io.Reader {
 	if len(a.keys) == 0 {
 		return strings.NewReader("")
 	}
@@ -166,7 +166,7 @@ func TestRun(t *testing.T) {
 		"bkt/secret-files/ORG_SERVICE_TOKEN":                {[]byte("org service token"), nil},
 	}
 	logbuf := &bytes.Buffer{}
-	fakeAgent := &FakeAgent{t: t}
+	fakeSSHAgent := &FakeSSHAgent{t: t}
 	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
@@ -176,7 +176,7 @@ func TestRun(t *testing.T) {
 		Prefix:              "pipeline",
 		Client:              &FakeClient{t: t, data: fakeData, bucket: "bkt"},
 		Logger:              log.New(logbuf, "", log.LstdFlags),
-		SSHAgent:            fakeAgent,
+		SSHAgent:            fakeSSHAgent,
 		BuildkiteAgent:      fakeBuildkiteAgent,
 		EnvSink:             envSink,
 		GitCredentialHelper: "/path/to/git-credential-s3-secrets",
@@ -186,7 +186,7 @@ func TestRun(t *testing.T) {
 	}
 
 	// verify ssh-agent
-	assertDeepEqual(t, []string{"pipeline key", "general key"}, fakeAgent.keys)
+	assertDeepEqual(t, []string{"pipeline key", "general key"}, fakeSSHAgent.keys)
 
 	// verify env
 	gitCredentialHelpers := strings.Join([]string{
@@ -222,7 +222,7 @@ func TestRun(t *testing.T) {
 func TestNoneFound(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
-	fakeAgent := &FakeAgent{t: t, keys: []string{}}
+	fakeSSHAgent := &FakeSSHAgent{t: t, keys: []string{}}
 	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
@@ -232,14 +232,14 @@ func TestNoneFound(t *testing.T) {
 		Prefix:         "pipeline",
 		Logger:         log.New(logbuf, "", log.LstdFlags),
 		Client:         &FakeClient{t: t, data: fakeData},
-		SSHAgent:       fakeAgent,
+		SSHAgent:       fakeSSHAgent,
 		BuildkiteAgent: fakeBuildkiteAgent,
 		EnvSink:        envSink,
 	}
 	if err := secrets.Run(&conf); err != nil {
 		t.Error(err)
 	}
-	assertDeepEqual(t, []string{}, fakeAgent.keys)
+	assertDeepEqual(t, []string{}, fakeSSHAgent.keys)
 	if envSink.Len() != 0 {
 		t.Errorf("expected envSink to be empty, got %q", envSink.String())
 	}
@@ -253,7 +253,7 @@ func TestNoneFound(t *testing.T) {
 func TestNoneFoundWithDisabledWarning(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
-	fakeAgent := &FakeAgent{t: t, keys: []string{}}
+	fakeSSHAgent := &FakeSSHAgent{t: t, keys: []string{}}
 	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
@@ -263,7 +263,7 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 		Prefix:                    "pipeline",
 		Logger:                    log.New(logbuf, "", log.LstdFlags),
 		Client:                    &FakeClient{t: t, data: fakeData},
-		SSHAgent:                  fakeAgent,
+		SSHAgent:                  fakeSSHAgent,
 		BuildkiteAgent:            fakeBuildkiteAgent,
 		EnvSink:                   envSink,
 		SkipSSHKeyNotFoundWarning: true,
@@ -271,7 +271,7 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 	if err := secrets.Run(&conf); err != nil {
 		t.Error(err)
 	}
-	assertDeepEqual(t, []string{}, fakeAgent.keys)
+	assertDeepEqual(t, []string{}, fakeSSHAgent.keys)
 	if envSink.Len() != 0 {
 		t.Errorf("expected envSink to be empty, got %q", envSink.String())
 	}
@@ -355,7 +355,7 @@ func TestSecretRedactionFromEnvFile(t *testing.T) {
 				"bkt/" + tt.envFileKey: {[]byte(tt.envContent), nil},
 			}
 			logbuf := &bytes.Buffer{}
-			fakeAgent := &FakeAgent{t: t}
+			fakeSSHAgent := &FakeSSHAgent{t: t}
 			fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 			envSink := &bytes.Buffer{}
 
@@ -365,7 +365,7 @@ func TestSecretRedactionFromEnvFile(t *testing.T) {
 				Prefix:         "pipeline",
 				Client:         &FakeClient{t: t, data: fakeData, bucket: "bkt"},
 				Logger:         log.New(logbuf, "", log.LstdFlags),
-				SSHAgent:       fakeAgent,
+				SSHAgent:       fakeSSHAgent,
 				BuildkiteAgent: fakeBuildkiteAgent,
 				EnvSink:        envSink,
 			}
@@ -458,7 +458,7 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 				"bkt/" + tt.secretFileKey: {[]byte(tt.secretValue), nil},
 			}
 			logbuf := &bytes.Buffer{}
-			fakeAgent := &FakeAgent{t: t}
+			fakeSSHAgent := &FakeSSHAgent{t: t}
 			fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 			envSink := &bytes.Buffer{}
 
@@ -474,7 +474,7 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 				Prefix:         "pipeline",
 				Client:         fakeClient,
 				Logger:         log.New(logbuf, "", log.LstdFlags),
-				SSHAgent:       fakeAgent,
+				SSHAgent:       fakeSSHAgent,
 				BuildkiteAgent: fakeBuildkiteAgent,
 				EnvSink:        envSink,
 			}
@@ -519,7 +519,7 @@ func TestSecretRedactionAllSources(t *testing.T) {
 	}
 
 	logbuf := &bytes.Buffer{}
-	fakeAgent := &FakeAgent{t: t}
+	fakeSSHAgent := &FakeSSHAgent{t: t}
 	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
@@ -535,7 +535,7 @@ func TestSecretRedactionAllSources(t *testing.T) {
 		Prefix:         "pipeline",
 		Client:         fakeClient,
 		Logger:         log.New(logbuf, "", log.LstdFlags),
-		SSHAgent:       fakeAgent,
+		SSHAgent:       fakeSSHAgent,
 		BuildkiteAgent: fakeBuildkiteAgent,
 		EnvSink:        envSink,
 	}
