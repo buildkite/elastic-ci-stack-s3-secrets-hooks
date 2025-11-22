@@ -112,6 +112,7 @@ echo Agent pid 42
 }
 
 type FakeBuildkiteAgent struct {
+	t               *testing.T
 	RedactedSecrets []string
 }
 
@@ -138,7 +139,7 @@ func (b *FakeBuildkiteAgent) RedactorAddSecretsFromJSON(filepath string) error {
 	for _, secret := range jsonSecrets {
 		b.RedactedSecrets = append(b.RedactedSecrets, secret)
 	}
-
+	b.t.Logf("FakeBuildkiteAgent RedactorAddSecretsFromJSON: %d secrets added to redactor", len(b.RedactedSecrets))
 	return nil
 }
 
@@ -166,7 +167,7 @@ func TestRun(t *testing.T) {
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
-	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
@@ -222,7 +223,7 @@ func TestNoneFound(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t, keys: []string{}}
-	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
@@ -253,7 +254,7 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t, keys: []string{}}
-	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
@@ -355,7 +356,7 @@ func TestSecretRedactionFromEnvFile(t *testing.T) {
 			}
 			logbuf := &bytes.Buffer{}
 			fakeAgent := &FakeAgent{t: t}
-			fakeBuildkiteAgent := &FakeBuildkiteAgent{}
+			fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 			envSink := &bytes.Buffer{}
 
 			conf := secrets.Config{
@@ -449,7 +450,6 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			secretValue:   "true",
 			shouldRedact:  false, // name not matching suffix _PASSWORD
 		},
-
 	}
 
 	for _, tt := range tests {
@@ -459,7 +459,7 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			}
 			logbuf := &bytes.Buffer{}
 			fakeAgent := &FakeAgent{t: t}
-			fakeBuildkiteAgent := &FakeBuildkiteAgent{}
+			fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 			envSink := &bytes.Buffer{}
 
 			fakeClient := &FakeClient{
@@ -520,7 +520,7 @@ func TestSecretRedactionAllSources(t *testing.T) {
 
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
-	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{t: t}
 	envSink := &bytes.Buffer{}
 
 	fakeClient := &FakeClient{
