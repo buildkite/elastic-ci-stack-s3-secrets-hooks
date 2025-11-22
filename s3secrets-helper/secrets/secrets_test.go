@@ -48,33 +48,23 @@ func (c *FakeClient) Bucket() string {
 }
 
 func (c *FakeClient) ListSuffix(prefix string, suffix []string) ([]string, error) {
-	prefixPath := c.bucket + "/" + prefix
 	var matches []string
 
-	// Iterate through all keys in the data map
-	for key := range c.data {
-		// Check if the key starts with the expected prefix
-		if !strings.HasPrefix(key, prefixPath+"/") {
+	for file := range c.data {
+		if !strings.HasPrefix(file, c.bucket+"/"+prefix) {
 			continue
 		}
-
-		// Extract the filename (last part after the prefix)
-		filename := strings.TrimPrefix(key, prefixPath+"/")
-
-		// Check if the filename ends with any of the provided suffixes
+		key := strings.TrimPrefix(file, c.bucket+"/")
 		for _, s := range suffix {
-			if strings.HasSuffix(filename, s) {
-				// Return the key relative to the bucket (without bucket prefix)
-				relativeKey := strings.TrimPrefix(key, c.bucket+"/")
-				matches = append(matches, relativeKey)
-				break // Only add once even if multiple suffixes match
+			if strings.HasSuffix(key, s) {
+				matches = append(matches, key)
+				break
 			}
 		}
 	}
 
 	// Sort results to ensure deterministic output
 	sort.Strings(matches)
-
 	return matches, nil
 }
 
