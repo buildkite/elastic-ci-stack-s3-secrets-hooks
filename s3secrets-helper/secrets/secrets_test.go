@@ -455,7 +455,7 @@ func TestSecretRedactionAllSources(t *testing.T) {
 		// Pipeline secret-files - valid secret
 		"bkt/pipeline/secret-files/DB_PASSWORD": {[]byte("dbpass123"), nil},
 		// Pipeline secret-files - false positive
-		"bkt/pipeline/secret-files/ENABLE_SECRETS": {[]byte("false"), nil},
+		"bkt/pipeline/secret-files/ENABLE_SECRETS": {[]byte("off"), nil},
 	}
 
 	logbuf := &bytes.Buffer{}
@@ -497,7 +497,7 @@ func TestSecretRedactionAllSources(t *testing.T) {
 		"true",  // from DISABLE_PASSWORD_PROMPT in bkt/env
 		"false", // from ENABLE_SECRETS in bkt/pipeline/environment
 		"yes",   // from DISABLE_TOKEN_AUTH in secret-files/
-		"false", // from ENABLE_SECRETS in pipeline/secret-files/
+		"off",   // from ENABLE_SECRETS in pipeline/secret-files/
 	}
 
 	// Verify all expected secrets are redacted
