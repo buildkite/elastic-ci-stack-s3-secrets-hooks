@@ -7,6 +7,8 @@ import (
 	"log"
 	"math/rand"
 	"reflect"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -46,17 +48,34 @@ func (c *FakeClient) Bucket() string {
 }
 
 func (c *FakeClient) ListSuffix(prefix string, suffix []string) ([]string, error) {
-	if prefix == "pipeline/secret-files" {
-		fakeSecrets := []string{"pipeline/secret-files/BUILDKITE_ACCESS_KEY", "pipeline/secret-files/DATABASE_SECRET",
-			"pipeline/secret-files/EXTERNAL_API_SECRET_KEY", "pipeline/secret-files/PRIVILEGED_PASSWORD", "pipeline/secret-files/SERVICE_TOKEN"}
-		return fakeSecrets, nil
+	prefixPath := c.bucket + "/" + prefix
+	var matches []string
+
+	// Iterate through all keys in the data map
+	for key := range c.data {
+		// Check if the key starts with the expected prefix
+		if !strings.HasPrefix(key, prefixPath+"/") {
+			continue
+		}
+
+		// Extract the filename (last part after the prefix)
+		filename := strings.TrimPrefix(key, prefixPath+"/")
+
+		// Check if the filename ends with any of the provided suffixes
+		for _, s := range suffix {
+			if strings.HasSuffix(filename, s) {
+				// Return the key relative to the bucket (without bucket prefix)
+				relativeKey := strings.TrimPrefix(key, c.bucket+"/")
+				matches = append(matches, relativeKey)
+				break // Only add once even if multiple suffixes match
+			}
+		}
 	}
 
-	if prefix == "secret-files" {
-		fakeSecrets := []string{"secret-files/ORG_SERVICE_TOKEN"}
-		return fakeSecrets, nil
-	}
-	return nil, nil
+	// Sort results to ensure deterministic output
+	sort.Strings(matches)
+
+	return matches, nil
 }
 
 func (c *FakeClient) Region() string {
@@ -236,5 +255,272 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 func assertDeepEqual(t *testing.T, expected, actual interface{}) {
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected %q, got %q", expected, actual)
+	}
+}
+
+// TestSecretRedactionFromEnvFile tests that secrets from env/environment files
+// are correctly identified for redaction based on their variable name suffix.
+func TestSecretRedactionFromEnvFile(t *testing.T) {
+	tests := []struct {
+		name            string
+		envFileKey      string
+		envContent      string
+		shouldRedact    []string // values that should be in secretsToRedact
+		shouldNotRedact []string // values that should NOT be in secretsToRedact
+	}{
+		{
+			name:            "root env file with valid secret suffixes",
+			envFileKey:      "env",
+			envContent:      "MY_PASSWORD=secret123\nAPI_SECRET=secret456\nAUTH_TOKEN=token789\nAWS_ACCESS_KEY=key123\nDB_SECRET_KEY=skey456",
+			shouldRedact:    []string{"secret123", "secret456", "token789", "key123", "skey456"},
+			shouldNotRedact: []string{},
+		},
+		{
+			name:            "root env file with false positives",
+			envFileKey:      "env",
+			envContent:      "DISABLE_PASSWORD_PROMPT=true\nENABLE_SECRETS=false\nDISABLE_TOKEN_AUTH=yes\nNO_ACCESS_KEY_NEEDED=1",
+			shouldRedact:    []string{},
+			shouldNotRedact: []string{"true", "false", "yes", "1"},
+		},
+		{
+			name:            "root env file mixed case",
+			envFileKey:      "env",
+			envContent:      "MY_PASSWORD=secret123\nDISABLE_PASSWORD_PROMPT=true\nAPI_SECRET=secret456\nENABLE_SECRETS=false",
+			shouldRedact:    []string{"secret123", "secret456"},
+			shouldNotRedact: []string{"true", "false"},
+		},
+		{
+			name:            "pipeline environment file with valid secret suffixes",
+			envFileKey:      "pipeline/environment",
+			envContent:      "DB_PASSWORD=dbpass\nSERVICE_SECRET=svcsecret\nAUTH_TOKEN=authtoken",
+			shouldRedact:    []string{"dbpass", "svcsecret", "authtoken"},
+			shouldNotRedact: []string{},
+		},
+		{
+			name:            "pipeline environment file with false positives",
+			envFileKey:      "pipeline/environment",
+			envContent:      "DISABLE_PASSWORD_PROMPT=true\nENABLE_SECRETS=false",
+			shouldRedact:    []string{},
+			shouldNotRedact: []string{"true", "false"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeData := map[string]FakeObject{
+				"bkt/" + tt.envFileKey: {[]byte(tt.envContent), nil},
+			}
+			logbuf := &bytes.Buffer{}
+			fakeAgent := &FakeAgent{t: t}
+			envSink := &bytes.Buffer{}
+
+			conf := secrets.Config{
+				Repo:     "git@github.com:buildkite/bash-example.git",
+				Bucket:   "bkt",
+				Prefix:   "pipeline",
+				Client:   &FakeClient{t: t, data: fakeData, bucket: "bkt"},
+				Logger:   log.New(logbuf, "", log.LstdFlags),
+				SSHAgent: fakeAgent,
+				EnvSink:  envSink,
+			}
+
+			if err := secrets.Run(&conf); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			redactedSecrets := conf.GetSecretsToRedactForTesting()
+
+			// Check that all expected secrets are redacted
+			for _, expectedSecret := range tt.shouldRedact {
+				if !slices.Contains(redactedSecrets, expectedSecret) {
+					t.Errorf("Expected secret %q to be in secretsToRedact, but it wasn't. Got: %v", expectedSecret, redactedSecrets)
+				}
+			}
+
+			// Check that false positives are NOT redacted
+			for _, notSecret := range tt.shouldNotRedact {
+				if slices.Contains(redactedSecrets, notSecret) {
+					t.Errorf("Expected value %q NOT to be in secretsToRedact, but it was. Got: %v", notSecret, redactedSecrets)
+				}
+			}
+		})
+	}
+}
+
+// TestSecretRedactionFromSecretFiles tests that secrets from secret-files
+// are correctly identified for redaction based on their filename suffix.
+func TestSecretRedactionFromSecretFiles(t *testing.T) {
+	tests := []struct {
+		name          string
+		secretFileKey string
+		secretValue   string
+		shouldRedact  bool
+	}{
+		{
+			name:          "root secret-files with valid suffix _PASSWORD",
+			secretFileKey: "secret-files/DATABASE_PASSWORD",
+			secretValue:   "dbpassword123",
+			shouldRedact:  true,
+		},
+		{
+			name:          "root secret-files with false positive DISABLE_PASSWORD_PROMPT",
+			secretFileKey: "secret-files/DISABLE_PASSWORD_PROMPT",
+			secretValue:   "true",
+			shouldRedact:  false,
+		},
+		{
+			name:          "root secret-files with valid suffix _SECRET",
+			secretFileKey: "secret-files/API_SECRET",
+			secretValue:   "apisecret123",
+			shouldRedact:  true,
+		},
+		{
+			name:          "root secret-files with false positive ENABLE_SECRETS",
+			secretFileKey: "secret-files/ENABLE_SECRETS",
+			secretValue:   "false",
+			shouldRedact:  false,
+		},
+		{
+			name:          "pipeline secret-files with valid suffix _TOKEN",
+			secretFileKey: "pipeline/secret-files/SERVICE_TOKEN",
+			secretValue:   "servicetoken123",
+			shouldRedact:  true,
+		},
+		{
+			name:          "pipeline secret-files with false positive",
+			secretFileKey: "pipeline/secret-files/DISABLE_PASSWORD_PROMPT",
+			secretValue:   "true",
+			shouldRedact:  false,
+		},
+		{
+			name:          "pipeline secret-files with valid suffix _ACCESS_KEY",
+			secretFileKey: "pipeline/secret-files/AWS_ACCESS_KEY",
+			secretValue:   "awsaccesskey123",
+			shouldRedact:  true,
+		},
+		{
+			name:          "pipeline secret-files with valid suffix _SECRET_KEY",
+			secretFileKey: "pipeline/secret-files/DATABASE_SECRET_KEY",
+			secretValue:   "dbsecretkey123",
+			shouldRedact:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeData := map[string]FakeObject{
+				"bkt/" + tt.secretFileKey: {[]byte(tt.secretValue), nil},
+			}
+			logbuf := &bytes.Buffer{}
+			fakeAgent := &FakeAgent{t: t}
+			envSink := &bytes.Buffer{}
+
+			fakeClient := &FakeClient{
+				t:      t,
+				data:   fakeData,
+				bucket: "bkt",
+			}
+
+			conf := secrets.Config{
+				Repo:     "git@github.com:buildkite/bash-example.git",
+				Bucket:   "bkt",
+				Prefix:   "pipeline",
+				Client:   fakeClient,
+				Logger:   log.New(logbuf, "", log.LstdFlags),
+				SSHAgent: fakeAgent,
+				EnvSink:  envSink,
+			}
+
+			if err := secrets.Run(&conf); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+
+			redactedSecrets := conf.GetSecretsToRedactForTesting()
+
+			if tt.shouldRedact {
+				if !slices.Contains(redactedSecrets, tt.secretValue) {
+					t.Errorf("Expected secret value %q to be in secretsToRedact, but it wasn't. Got: %v", tt.secretValue, redactedSecrets)
+				}
+			} else {
+				if slices.Contains(redactedSecrets, tt.secretValue) {
+					t.Errorf("Expected value %q NOT to be in secretsToRedact, but it was. Got: %v", tt.secretValue, redactedSecrets)
+				}
+			}
+		})
+	}
+}
+
+// TestSecretRedactionAllSources tests a comprehensive scenario with secrets
+// from all four sources to ensure they're all handled correctly.
+func TestSecretRedactionAllSources(t *testing.T) {
+	fakeData := map[string]FakeObject{
+		// Root env file - mix of valid secrets and false positives
+		"bkt/env": {[]byte("ROOT_PASSWORD=rootpass\nDISABLE_PASSWORD_PROMPT=true"), nil},
+		// Pipeline env file - mix of valid secrets and false positives
+		"bkt/pipeline/environment": {[]byte("PIPELINE_SECRET=pipesecret\nENABLE_SECRETS=false"), nil},
+		// Root secret-files - valid secret
+		"bkt/secret-files/API_TOKEN": {[]byte("apitoken123"), nil},
+		// Root secret-files - false positive
+		"bkt/secret-files/DISABLE_TOKEN_AUTH": {[]byte("yes"), nil},
+		// Pipeline secret-files - valid secret
+		"bkt/pipeline/secret-files/DB_PASSWORD": {[]byte("dbpass123"), nil},
+		// Pipeline secret-files - false positive
+		"bkt/pipeline/secret-files/ENABLE_SECRETS": {[]byte("false"), nil},
+	}
+
+	logbuf := &bytes.Buffer{}
+	fakeAgent := &FakeAgent{t: t}
+	envSink := &bytes.Buffer{}
+
+	fakeClient := &FakeClient{
+		t:      t,
+		data:   fakeData,
+		bucket: "bkt",
+	}
+
+	conf := secrets.Config{
+		Repo:     "git@github.com:buildkite/bash-example.git",
+		Bucket:   "bkt",
+		Prefix:   "pipeline",
+		Client:   fakeClient,
+		Logger:   log.New(logbuf, "", log.LstdFlags),
+		SSHAgent: fakeAgent,
+		EnvSink:  envSink,
+	}
+
+	if err := secrets.Run(&conf); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	redactedSecrets := conf.GetSecretsToRedactForTesting()
+
+	// Values that SHOULD be redacted (end with secret suffix)
+	shouldRedact := []string{
+		"rootpass",    // from ROOT_PASSWORD in bkt/env
+		"pipesecret",  // from PIPELINE_SECRET in bkt/pipeline/environment
+		"apitoken123", // from API_TOKEN in secret-files/
+		"dbpass123",   // from DB_PASSWORD in pipeline/secret-files/
+	}
+
+	// Values that should NOT be redacted (suffix in middle of name)
+	shouldNotRedact := []string{
+		"true",  // from DISABLE_PASSWORD_PROMPT in bkt/env
+		"false", // from ENABLE_SECRETS in bkt/pipeline/environment
+		"yes",   // from DISABLE_TOKEN_AUTH in secret-files/
+		"false", // from ENABLE_SECRETS in pipeline/secret-files/
+	}
+
+	// Verify all expected secrets are redacted
+	for _, expectedSecret := range shouldRedact {
+		if !slices.Contains(redactedSecrets, expectedSecret) {
+			t.Errorf("Expected secret %q to be in secretsToRedact, but it wasn't. Got: %v", expectedSecret, redactedSecrets)
+		}
+	}
+
+	// Verify false positives are NOT redacted
+	for _, notSecret := range shouldNotRedact {
+		if slices.Contains(redactedSecrets, notSecret) {
+			t.Errorf("Expected value %q NOT to be in secretsToRedact, but it was. Got: %v", notSecret, redactedSecrets)
+		}
 	}
 }
