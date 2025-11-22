@@ -377,10 +377,10 @@ func handleSecrets(conf *Config, results <-chan getResult) error {
 	return nil
 }
 
-// isSecretVar checks if an environment variable name contains any of the secret suffixes
+// isSecretVar checks if an environment variable name has any of the secret suffixes
 func isSecretVar(key string) bool {
 	for _, suffix := range defaultSecretSuffixes {
-		if strings.Contains(key, suffix) {
+		if strings.HasSuffix(key, suffix) {
 			return true
 		}
 	}
