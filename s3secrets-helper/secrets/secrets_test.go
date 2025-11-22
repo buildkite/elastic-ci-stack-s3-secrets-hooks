@@ -2,10 +2,12 @@ package secrets_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"math/rand"
+	"os"
 	"reflect"
 	"slices"
 	"sort"
@@ -109,6 +111,37 @@ echo Agent pid 42
 `)
 }
 
+type FakeBuildkiteAgent struct {
+	RedactedSecrets []string
+}
+
+func (b *FakeBuildkiteAgent) Version() string {
+	return "3.73.0"
+}
+
+func (b *FakeBuildkiteAgent) SupportsRedactor() bool {
+	return true
+}
+
+func (b *FakeBuildkiteAgent) RedactorAddSecretsFromJSON(filepath string) error {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return err
+	}
+
+	var jsonSecrets map[string]string
+	if err := json.Unmarshal(data, &jsonSecrets); err != nil {
+		return err
+	}
+
+	// Extract all secret values from the JSON map
+	for _, secret := range jsonSecrets {
+		b.RedactedSecrets = append(b.RedactedSecrets, secret)
+	}
+
+	return nil
+}
+
 func TestRun(t *testing.T) {
 	fakeData := map[string]FakeObject{
 		"bkt/pipeline/private_ssh_key": {nil, sentinel.ErrNotFound},
@@ -133,6 +166,7 @@ func TestRun(t *testing.T) {
 	}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
@@ -142,6 +176,7 @@ func TestRun(t *testing.T) {
 		Client:              &FakeClient{t: t, data: fakeData, bucket: "bkt"},
 		Logger:              log.New(logbuf, "", log.LstdFlags),
 		SSHAgent:            fakeAgent,
+		BuildkiteAgent:      fakeBuildkiteAgent,
 		EnvSink:             envSink,
 		GitCredentialHelper: "/path/to/git-credential-s3-secrets",
 	}
@@ -187,16 +222,18 @@ func TestNoneFound(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t, keys: []string{}}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
-		Repo:     "git@github.com:buildkite/bash-example.git",
-		Bucket:   "bkt",
-		Prefix:   "pipeline",
-		Logger:   log.New(logbuf, "", log.LstdFlags),
-		Client:   &FakeClient{t: t, data: fakeData},
-		SSHAgent: fakeAgent,
-		EnvSink:  envSink,
+		Repo:           "git@github.com:buildkite/bash-example.git",
+		Bucket:         "bkt",
+		Prefix:         "pipeline",
+		Logger:         log.New(logbuf, "", log.LstdFlags),
+		Client:         &FakeClient{t: t, data: fakeData},
+		SSHAgent:       fakeAgent,
+		BuildkiteAgent: fakeBuildkiteAgent,
+		EnvSink:        envSink,
 	}
 	if err := secrets.Run(&conf); err != nil {
 		t.Error(err)
@@ -216,6 +253,7 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 	fakeData := map[string]FakeObject{}
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t, keys: []string{}}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
 	envSink := &bytes.Buffer{}
 
 	conf := secrets.Config{
@@ -225,6 +263,7 @@ func TestNoneFoundWithDisabledWarning(t *testing.T) {
 		Logger:                    log.New(logbuf, "", log.LstdFlags),
 		Client:                    &FakeClient{t: t, data: fakeData},
 		SSHAgent:                  fakeAgent,
+		BuildkiteAgent:            fakeBuildkiteAgent,
 		EnvSink:                   envSink,
 		SkipSSHKeyNotFoundWarning: true,
 	}
@@ -316,23 +355,25 @@ func TestSecretRedactionFromEnvFile(t *testing.T) {
 			}
 			logbuf := &bytes.Buffer{}
 			fakeAgent := &FakeAgent{t: t}
+			fakeBuildkiteAgent := &FakeBuildkiteAgent{}
 			envSink := &bytes.Buffer{}
 
 			conf := secrets.Config{
-				Repo:     "git@github.com:buildkite/bash-example.git",
-				Bucket:   "bkt",
-				Prefix:   "pipeline",
-				Client:   &FakeClient{t: t, data: fakeData, bucket: "bkt"},
-				Logger:   log.New(logbuf, "", log.LstdFlags),
-				SSHAgent: fakeAgent,
-				EnvSink:  envSink,
+				Repo:           "git@github.com:buildkite/bash-example.git",
+				Bucket:         "bkt",
+				Prefix:         "pipeline",
+				Client:         &FakeClient{t: t, data: fakeData, bucket: "bkt"},
+				Logger:         log.New(logbuf, "", log.LstdFlags),
+				SSHAgent:       fakeAgent,
+				BuildkiteAgent: fakeBuildkiteAgent,
+				EnvSink:        envSink,
 			}
 
 			if err := secrets.Run(&conf); err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
 
-			redactedSecrets := conf.GetSecretsToRedactForTesting()
+			redactedSecrets := fakeBuildkiteAgent.RedactedSecrets
 
 			// Check that all expected secrets are redacted
 			for _, expectedSecret := range tt.shouldRedact {
@@ -418,6 +459,7 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			}
 			logbuf := &bytes.Buffer{}
 			fakeAgent := &FakeAgent{t: t}
+			fakeBuildkiteAgent := &FakeBuildkiteAgent{}
 			envSink := &bytes.Buffer{}
 
 			fakeClient := &FakeClient{
@@ -427,20 +469,21 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			}
 
 			conf := secrets.Config{
-				Repo:     "git@github.com:buildkite/bash-example.git",
-				Bucket:   "bkt",
-				Prefix:   "pipeline",
-				Client:   fakeClient,
-				Logger:   log.New(logbuf, "", log.LstdFlags),
-				SSHAgent: fakeAgent,
-				EnvSink:  envSink,
+				Repo:           "git@github.com:buildkite/bash-example.git",
+				Bucket:         "bkt",
+				Prefix:         "pipeline",
+				Client:         fakeClient,
+				Logger:         log.New(logbuf, "", log.LstdFlags),
+				SSHAgent:       fakeAgent,
+				BuildkiteAgent: fakeBuildkiteAgent,
+				EnvSink:        envSink,
 			}
 
 			if err := secrets.Run(&conf); err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
 
-			redactedSecrets := conf.GetSecretsToRedactForTesting()
+			redactedSecrets := fakeBuildkiteAgent.RedactedSecrets
 
 			if tt.shouldRedact {
 				if !slices.Contains(redactedSecrets, tt.secretValue) {
@@ -477,6 +520,7 @@ func TestSecretRedactionAllSources(t *testing.T) {
 
 	logbuf := &bytes.Buffer{}
 	fakeAgent := &FakeAgent{t: t}
+	fakeBuildkiteAgent := &FakeBuildkiteAgent{}
 	envSink := &bytes.Buffer{}
 
 	fakeClient := &FakeClient{
@@ -486,20 +530,21 @@ func TestSecretRedactionAllSources(t *testing.T) {
 	}
 
 	conf := secrets.Config{
-		Repo:     "git@github.com:buildkite/bash-example.git",
-		Bucket:   "bkt",
-		Prefix:   "pipeline",
-		Client:   fakeClient,
-		Logger:   log.New(logbuf, "", log.LstdFlags),
-		SSHAgent: fakeAgent,
-		EnvSink:  envSink,
+		Repo:           "git@github.com:buildkite/bash-example.git",
+		Bucket:         "bkt",
+		Prefix:         "pipeline",
+		Client:         fakeClient,
+		Logger:         log.New(logbuf, "", log.LstdFlags),
+		SSHAgent:       fakeAgent,
+		BuildkiteAgent: fakeBuildkiteAgent,
+		EnvSink:        envSink,
 	}
 
 	if err := secrets.Run(&conf); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	redactedSecrets := conf.GetSecretsToRedactForTesting()
+	redactedSecrets := fakeBuildkiteAgent.RedactedSecrets
 
 	// Values that SHOULD be redacted (end with secret suffix)
 	shouldRedact := []string{
