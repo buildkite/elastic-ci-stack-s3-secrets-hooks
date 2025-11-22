@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	// MinSecretSize is the minimum size for a secret to be redacted.
+	// Secrets shorter than this will generate a warning and be skipped.
+	MinSecretSize = 6
 	// MaxSecretSize is the maximum size for a secret to be redacted (64KB) as per Agent limitations.
 	// Secrets larger than this will generate a warning and be skipped.
 	MaxSecretSize = 65536
@@ -429,6 +432,10 @@ func redactSecret(conf *Config, secretValue string) {
 		return
 	}
 
+	if len(secretValue) < MinSecretSize {
+		conf.Logger.Printf("Warning: Secret is too short for redaction (%d bytes, min %d bytes)", len(secretValue), MinSecretSize)
+		return
+	}
 	if len(secretValue) >= MaxSecretSize {
 		conf.Logger.Printf("Warning: Secret is too large for redaction (%d bytes, max %d bytes)", len(secretValue), MaxSecretSize)
 		return
