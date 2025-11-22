@@ -249,7 +249,7 @@ func assertDeepEqual(t *testing.T, expected, actual interface{}) {
 }
 
 // TestSecretRedactionFromEnvFile tests that secrets from env/environment files
-// are correctly identified for redaction based on their variable name suffix.
+// are correctly identified for redaction based on their variable name suffix and length.
 func TestSecretRedactionFromEnvFile(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -261,37 +261,51 @@ func TestSecretRedactionFromEnvFile(t *testing.T) {
 		{
 			name:            "root env file with valid secret suffixes",
 			envFileKey:      "env",
-			envContent:      "MY_PASSWORD=secret123\nAPI_SECRET=secret456\nAUTH_TOKEN=token789\nAWS_ACCESS_KEY=key123\nDB_SECRET_KEY=skey456",
-			shouldRedact:    []string{"secret123", "secret456", "token789", "key123", "skey456"},
+			envContent:      "MY_PASSWORD=secret123\nAPI_SECRET=secret456\nAUTH_TOKEN=token789\nAWS_ACCESS_KEY=akia-key123\nDB_SECRET_KEY=dbseckey456",
+			shouldRedact:    []string{"secret123", "secret456", "token789", "akia-key123", "dbseckey456"},
 			shouldNotRedact: []string{},
 		},
 		{
-			name:            "root env file with false positives",
+			name:            "root env file with false positives in var name",
 			envFileKey:      "env",
-			envContent:      "DISABLE_PASSWORD_PROMPT=true\nENABLE_SECRETS=false\nDISABLE_TOKEN_AUTH=yes\nNO_ACCESS_KEY_NEEDED=1",
+			envContent:      "DISABLE_PASSWORD_PROMPT=true\nENABLE_SECRETS=only-on-ci\nDISABLE_TOKEN_AUTH=always-disable\nNO_ACCESS_KEY_NEEDED=1",
 			shouldRedact:    []string{},
-			shouldNotRedact: []string{"true", "false", "yes", "1"},
+			shouldNotRedact: []string{"true", "only-on-ci", "always-disable", "1"},
+		},
+		{
+			name:            "root env file with false positives in value min length",
+			envFileKey:      "env",
+			envContent:      "DISABLE_PASSWORD=1\nENABLE_SECRET=true\nACCESS_KEY=no\nGITHUB_TOKEN=none",
+			shouldRedact:    []string{},
+			shouldNotRedact: []string{"1", "true", "no", "none"},
 		},
 		{
 			name:            "root env file mixed case",
 			envFileKey:      "env",
-			envContent:      "MY_PASSWORD=secret123\nDISABLE_PASSWORD_PROMPT=true\nAPI_SECRET=secret456\nENABLE_SECRETS=false",
+			envContent:      "MY_PASSWORD=secret123\nDISABLE_PASSWORD_PROMPT=only-on-ci\nAPI_SECRET=secret456\nBUCKET_FOR_SECRETS=bucket-for-secrets\nHIDE_PASSWORD=true",
 			shouldRedact:    []string{"secret123", "secret456"},
-			shouldNotRedact: []string{"true", "false"},
+			shouldNotRedact: []string{"only-on-ci", "s3://bucket-for-secrets", "true"},
 		},
 		{
 			name:            "pipeline environment file with valid secret suffixes",
 			envFileKey:      "pipeline/environment",
-			envContent:      "DB_PASSWORD=dbpass\nSERVICE_SECRET=svcsecret\nAUTH_TOKEN=authtoken",
-			shouldRedact:    []string{"dbpass", "svcsecret", "authtoken"},
+			envContent:      "DB_PASSWORD=dbpass123\nSERVICE_SECRET=svcsecret\nAUTH_TOKEN=authtoken",
+			shouldRedact:    []string{"dbpass123", "svcsecret", "authtoken"},
 			shouldNotRedact: []string{},
 		},
 		{
-			name:            "pipeline environment file with false positives",
+			name:            "pipeline environment file with false positives in var name",
 			envFileKey:      "pipeline/environment",
-			envContent:      "DISABLE_PASSWORD_PROMPT=true\nENABLE_SECRETS=false",
+			envContent:      "DISABLE_PASSWORD_PROMPT=only-on-ci\nBUCKET_FOR_SECRETS=bucket-for-secrets",
 			shouldRedact:    []string{},
-			shouldNotRedact: []string{"true", "false"},
+			shouldNotRedact: []string{"only-on-ci", "bucket-for-secrets"},
+		},
+		{
+			name:            "pipeline environment file with false positives in value min length",
+			envFileKey:      "pipeline/environment",
+			envContent:      "DISABLE_PASSWORD=1\nENABLE_SECRET=true\nACCESS_KEY=no\nGITHUB_TOKEN=none",
+			shouldRedact:    []string{},
+			shouldNotRedact: []string{"1", "true", "no", "none"},
 		},
 	}
 
@@ -353,22 +367,10 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			shouldRedact:  true,
 		},
 		{
-			name:          "root secret-files with false positive DISABLE_PASSWORD_PROMPT",
-			secretFileKey: "secret-files/DISABLE_PASSWORD_PROMPT",
+			name:          "root secret-files with value too short DISABLE_PASSWORD",
+			secretFileKey: "secret-files/DISABLE_PASSWORD",
 			secretValue:   "true",
-			shouldRedact:  false,
-		},
-		{
-			name:          "root secret-files with valid suffix _SECRET",
-			secretFileKey: "secret-files/API_SECRET",
-			secretValue:   "apisecret123",
-			shouldRedact:  true,
-		},
-		{
-			name:          "root secret-files with false positive ENABLE_SECRETS",
-			secretFileKey: "secret-files/ENABLE_SECRETS",
-			secretValue:   "false",
-			shouldRedact:  false,
+			shouldRedact:  false, // value < MinSecretSize
 		},
 		{
 			name:          "pipeline secret-files with valid suffix _TOKEN",
@@ -377,10 +379,10 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			shouldRedact:  true,
 		},
 		{
-			name:          "pipeline secret-files with false positive",
-			secretFileKey: "pipeline/secret-files/DISABLE_PASSWORD_PROMPT",
-			secretValue:   "true",
-			shouldRedact:  false,
+			name:          "root secret-files with value too short GITHUB_TOKEN",
+			secretFileKey: "secret-files/GITHUB_TOKEN",
+			secretValue:   "none",
+			shouldRedact:  false, // value < MinSecretSize
 		},
 		{
 			name:          "pipeline secret-files with valid suffix _ACCESS_KEY",
@@ -389,11 +391,24 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 			shouldRedact:  true,
 		},
 		{
+			name:          "root secret-files with valid suffix _SECRET",
+			secretFileKey: "secret-files/API_SECRET",
+			secretValue:   "apisecret123",
+			shouldRedact:  true,
+		},
+		{
 			name:          "pipeline secret-files with valid suffix _SECRET_KEY",
 			secretFileKey: "pipeline/secret-files/DATABASE_SECRET_KEY",
 			secretValue:   "dbsecretkey123",
 			shouldRedact:  true,
 		},
+		{
+			name:          "pipeline secret-files with false positive filename",
+			secretFileKey: "pipeline/secret-files/DISABLE_PASSWORD_PROMPT",
+			secretValue:   "true",
+			shouldRedact:  false, // name not matching suffix _PASSWORD
+		},
+
 	}
 
 	for _, tt := range tests {
@@ -444,18 +459,20 @@ func TestSecretRedactionFromSecretFiles(t *testing.T) {
 // from all four sources to ensure they're all handled correctly.
 func TestSecretRedactionAllSources(t *testing.T) {
 	fakeData := map[string]FakeObject{
-		// Root env file - mix of valid secrets and false positives
-		"bkt/env": {[]byte("ROOT_PASSWORD=rootpass\nDISABLE_PASSWORD_PROMPT=true"), nil},
+		// Root env file - mix of valid secrets and false positives by env var name and false positive in value min length
+		"bkt/env": {[]byte("ROOT_PASSWORD=rootpass\nNEW_PASSWORD_PROMPT=please-enter-a-new-password\nDISABLE_PASSWORD=1"), nil},
 		// Pipeline env file - mix of valid secrets and false positives
-		"bkt/pipeline/environment": {[]byte("PIPELINE_SECRET=pipesecret\nENABLE_SECRETS=false"), nil},
+		"bkt/pipeline/environment": {[]byte("PIPELINE_SECRET=pipesecret\nREDACT_SECRETS=only-on-ci"), nil},
 		// Root secret-files - valid secret
 		"bkt/secret-files/API_TOKEN": {[]byte("apitoken123"), nil},
-		// Root secret-files - false positive
-		"bkt/secret-files/DISABLE_TOKEN_AUTH": {[]byte("yes"), nil},
+		// Root secret-files - false positive in filename
+		"bkt/secret-files/DISABLE_TOKEN_AUTH": {[]byte("always-disable"), nil},
 		// Pipeline secret-files - valid secret
 		"bkt/pipeline/secret-files/DB_PASSWORD": {[]byte("dbpass123"), nil},
-		// Pipeline secret-files - false positive
-		"bkt/pipeline/secret-files/ENABLE_SECRETS": {[]byte("off"), nil},
+		// Pipeline secret-files - valid file but value too short
+		"bkt/pipeline/secret-files/ADMIN_PASSWORD": {[]byte("admin"), nil},
+		// Pipeline secret-files - false positive in filename
+		"bkt/pipeline/secret-files/ENABLE_SECRETS": {[]byte("always-enable"), nil},
 	}
 
 	logbuf := &bytes.Buffer{}
@@ -494,10 +511,12 @@ func TestSecretRedactionAllSources(t *testing.T) {
 
 	// Values that should NOT be redacted (suffix in middle of name)
 	shouldNotRedact := []string{
-		"true",  // from DISABLE_PASSWORD_PROMPT in bkt/env
-		"false", // from ENABLE_SECRETS in bkt/pipeline/environment
-		"yes",   // from DISABLE_TOKEN_AUTH in secret-files/
-		"off",   // from ENABLE_SECRETS in pipeline/secret-files/
+		"please-enter-a-new-password", // from NEW_PASSWORD_PROMPT in bkt/env
+		"only-on-ci",                  // from REDACT_SECRETS in bkt/pipeline/environment
+		"always-disable",              // from DISABLE_TOKEN_AUTH in secret-files/
+		"always-enable",               // from ENABLE_SECRETS in pipeline/secret-files/
+		"1",                           // from DISABLE_PASSWORD in bkt/env (name match but value < MinSecretSize)
+		"admin",                       // from ADMIN_PASSWORD in pipeline/secret-files/ (value < MinSecretSize)
 	}
 
 	// Verify all expected secrets are redacted
