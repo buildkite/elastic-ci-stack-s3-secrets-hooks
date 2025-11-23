@@ -295,8 +295,8 @@ func TestSecretRedactionFromEnvFile(t *testing.T) {
 		name            string
 		envFileKey      string
 		envContent      string
-		shouldRedact    []string // values that should be in secretsToRedact
-		shouldNotRedact []string // values that should NOT be in secretsToRedact
+		shouldRedact    []string
+		shouldNotRedact []string
 	}{
 		{
 			name:            "root env file with valid secret suffixes",

@@ -41,6 +41,9 @@ func (b *Agent) RedactorAddSecretsFromJSON(filepath string) error {
 	return nil
 }
 
+// detectAgentCapabilities discovers what the buildkite-agent supports.
+// We detect the actual version and check if the redactor command exists.
+// JSON format support is guaranteed when redactor is available.
 func (b *Agent) detectAgentCapabilities() {
 	_, err := exec.LookPath("buildkite-agent")
 	if err != nil {
