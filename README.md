@@ -96,12 +96,14 @@ Note the `-sse aws:kms`, as without this your secrets will fail to download.
 
 For git over https, you can use a `git-credentials` file with credential urls in the format of:
 
-```bash
-https://user:password@host/path/to/repo
+```
+https://user:password@host
 ```
 
+Credentials are matched at the host level, so a single entry covers all repositories on that host. If you need different credentials for different hosts, add one line per host.
+
 ```bash
-aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host/path/to/repo") "s3://${secrets_bucket}/git-credentials"
+aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host") "s3://${secrets_bucket}/git-credentials"
 ```
 
 These are then exposed via a [gitcredential helper](https://git-scm.com/docs/gitcredentials) which will download the
