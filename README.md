@@ -87,7 +87,7 @@ ssh-keygen -t rsa -b 4096 -f id_rsa_buildkite
 pbcopy < id_rsa_buildkite.pub # paste this into your github deploy key
 
 export secrets_bucket=my-buildkite-secrets
-aws s3 cp --acl private --sse aws:kms id_rsa_buildkite "s3://${secrets_bucket}/private_ssh_key"
+aws s3 cp --sse aws:kms id_rsa_buildkite "s3://${secrets_bucket}/private_ssh_key"
 ```
 
 Note the `-sse aws:kms`, as without this your secrets will fail to download.
@@ -102,8 +102,15 @@ https://user:password@host
 
 Credentials are matched at the host level, so a single entry covers all repositories on that host. If you need different credentials for different hosts, add one line per host.
 
+The file must end with a newline — entries on the final line without one are silently ignored.
+
 ```bash
-aws s3 cp --acl private --sse aws:kms <(echo "https://user:password@host") "s3://${secrets_bucket}/git-credentials"
+# Single host
+aws s3 cp --sse aws:kms <(echo "https://user:password@host") "s3://${secrets_bucket}/git-credentials"
+
+# Multiple hosts
+printf "https://user1:password1@host1\nhttps://user2:password2@host2\n" | \
+  aws s3 cp --sse aws:kms - "s3://${secrets_bucket}/git-credentials"
 ```
 
 These are then exposed via a [gitcredential helper](https://git-scm.com/docs/gitcredentials) which will download the
@@ -114,7 +121,7 @@ credentials as needed.
 Key values pairs can also be uploaded.
 
 ```bash
-aws s3 cp --acl private --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment"
+aws s3 cp --sse aws:kms <(echo "MY_SECRET=blah") "s3://${secrets_bucket}/environment"
 ```
 
 ### Individual Secrets
@@ -124,7 +131,7 @@ Individual secrets with a suffix of `_SECRET`, `_SECRET_KEY`, `_PASSWORD`, `_TOK
 The file contents should be the secret value, and the object key becomes the environment variable name. For example:
 
 ```bash
-aws s3 cp --acl private --sse aws:kms <(echo "<SECRET_VALUE>") "s3://${secrets_bucket}/secret-files/SPECIAL_SECRET"
+aws s3 cp --sse aws:kms <(echo "<SECRET_VALUE>") "s3://${secrets_bucket}/secret-files/SPECIAL_SECRET"
 ```
 
 ## Options
