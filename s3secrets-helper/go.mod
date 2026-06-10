@@ -1,6 +1,6 @@
 module github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2
 
-go 1.24
+go 1.26.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.9
