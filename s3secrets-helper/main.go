@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/buildkiteagent"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/env"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/s3"
 	"github.com/buildkite/elastic-ci-stack-s3-secrets-hooks/s3secrets-helper/v2/secrets"
@@ -41,7 +42,9 @@ func mainWithError(log *log.Logger) error {
 		return err
 	}
 
-	agent := &sshagent.Agent{}
+	sshAgent := &sshagent.Agent{}
+
+	buildkiteAgent := buildkiteagent.New()
 
 	credHelper := os.Getenv(env.EnvCredHelper)
 	if credHelper == "" {
@@ -54,7 +57,8 @@ func mainWithError(log *log.Logger) error {
 		Prefix:                    prefix,
 		Client:                    client,
 		Logger:                    log,
-		SSHAgent:                  agent,
+		SSHAgent:                  sshAgent,
+		BuildkiteAgent:            buildkiteAgent,
 		EnvSink:                   os.Stdout,
 		GitCredentialHelper:       credHelper,
 		SkipSSHKeyNotFoundWarning: isEnvVarEnabled(env.EnvSkipSSHKeyNotFoundWarning),
