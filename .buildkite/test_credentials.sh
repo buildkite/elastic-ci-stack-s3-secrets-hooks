@@ -18,7 +18,7 @@ s3secrets-helper() {
     --volume $(pwd)/s3secrets-helper:/s3secrets-helper \
     --workdir /s3secrets-helper \
     --env-file <(env | egrep 'AWS|BUILDKITE') \
-    golang:1.26 \
+    golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd \
     bash -c 'go build && ./s3secrets-helper'
 }
 
